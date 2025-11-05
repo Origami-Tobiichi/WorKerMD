@@ -1,23 +1,31 @@
-FROM node:18-alpine
+FROM node:18-bullseye
 
 WORKDIR /app
 
-# Install hanya dependencies yang ESSENTIAL (lebih cepat)
-RUN apk update && apk add --no-cache \
+# Install system dependencies untuk Debian
+RUN apt-get update && \
+    apt-get install -y \
     ffmpeg \
-    libwebp-tools \
-    curl
+    imagemagick \
+    webp \
+    curl \
+    wget \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy package.json saja dulu
-COPY package.json .
+# Copy package files
+COPY package*.json ./
 
-# FIX: Perbaiki versi cheerio secara otomatis jika masih salah
-RUN sed -i 's/"cheerio": "[^"]*"/"cheerio": "^1.0.0-rc.10"/g' package.json
+# Perbaiki versi cheerio jika masih salah
+RUN if grep -q '"cheerio": "^1.0.-rc.10"' package.json; then \
+        sed -i 's/"cheerio": "^1.0.-rc.10"/"cheerio": "^1.0.0-rc.10"/g' package.json; \
+        echo "Fixed cheerio version in package.json"; \
+    fi
 
-# Install dependencies dengan cache optimization
+# Install npm dependencies
 RUN npm install --legacy-peer-deps --omit=dev --no-audit --no-fund
 
-# Copy sisa source code
+# Copy source code
 COPY . .
 
 # Create necessary directories
@@ -25,8 +33,8 @@ RUN mkdir -p views nazedev
 
 EXPOSE 3000
 
-# Simple health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:3000/ || exit 1
 
 CMD ["npm", "start"]
