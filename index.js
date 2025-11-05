@@ -177,16 +177,7 @@ async function startNazeBot() {
 			console.log('Phone number captured. Waiting for Connection...\n' + chalk.blueBright('Estimated time: around 2 ~ 5 minutes'))
 		})()
 	}
-	// Di bagian yang menghasilkan pairing code, tambahkan:
-        // Kirim pairing code ke server web
-        try {
-            await axios.get(`http://localhost:${PORT}/set-pairing-code?code=${code}`);
-        } catch (e) {
-            console.log('Failed to send pairing code to web server');
-        }
-    }, 3000)
-}
-	
+
 	await Solving(naze, store)
 	
 	naze.ev.on('creds.update', saveCreds)
@@ -362,6 +353,7 @@ fs.watchFile(file, () => {
 	delete require.cache[file]
 	require(file)
 });
+
 
 
 
