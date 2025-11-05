@@ -1,18 +1,41 @@
-FROM node:lts-bullseye
+FROM node:18-alpine
 
-RUN apt-get update && \
-    apt-get install -y \
+WORKDIR /app
+
+# Install system dependencies
+RUN apk update && apk add --no-cache \
     ffmpeg \
     imagemagick \
-    webp && \
-    rm -rf /var/lib/apt/lists/*
+    webp \
+    python3 \
+    make \
+    g++ \
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY package.json .
+# Copy package files
+COPY package*.json ./
 
-RUN npm install --legacy-peer-deps
+# Install npm dependencies dengan cache optimization
+RUN npm config set registry https://registry.npmjs.org/ \
+    && npm install --legacy-peer-deps --production \
+    && npm cache clean --force
 
+# Copy source code
 COPY . .
 
-EXPOSE 5000
+# Create necessary directories
+RUN mkdir -p views nazedev
 
+# Fix permissions
+RUN chmod -R 755 /app
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD node -e "require('http').get('http://localhost:3000', (res) => process.exit(res.statusCode === 200 ? 0 : 1))"
+
+# Start application
 CMD ["npm", "start"]
