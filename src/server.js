@@ -16,11 +16,25 @@ app.set('views', path.join(process.cwd(), 'views'));
 // Static files
 app.use(express.static(path.join(process.cwd(), 'public')));
 
+// Data untuk dikirim ke template EJS
+const packageInfo = {
+    name: 'hitori',
+    version: '1.0.8',
+    author: 'Mazeker',
+    description: 'Bot WhatsApp Using Lib Balloys Multi worker'
+};
+
 // Routes
 app.get('/', (req, res) => {
     res.render('index', { 
         title: 'Naze Bot',
-        port: PORT
+        port: PORT,
+        packageInfo: packageInfo, // Tambahkan ini
+        bot_name: packageInfo.name,
+        version: packageInfo.version,
+        author: packageInfo.author,
+        description: packageInfo.description,
+        uptime: '2311 second'
     });
 });
 
@@ -58,6 +72,33 @@ app.get('/status', (req, res) => {
         port: PORT,
         pairingCode: global.pairingCode || null
     });
+});
+
+// Health check endpoint untuk Koyeb
+app.get('/health', (req, res) => {
+    res.status(200).json({ 
+        status: 'OK', 
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+    });
+});
+
+// Error handling untuk view tidak ditemukan
+app.use((err, req, res, next) => {
+    if (err.message.includes('Failed to lookup view')) {
+        return res.json({
+            status: 'Bot is running',
+            message: 'Web interface not available, but bot is functional',
+            port: PORT,
+            pairingCode: global.pairingCode || null
+        });
+    }
+    next(err);
+});
+
+// Start server
+server.listen(PORT, () => {
+    console.log(`App listened on port ${PORT}`);
 });
 
 module.exports = { app, server, PORT };
