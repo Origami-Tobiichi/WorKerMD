@@ -178,7 +178,7 @@ async function startNazeBot() {
 		})()
 	}
 	// Di bagian yang menghasilkan pairing code, tambahkan:
-if (connection === 'connecting' || !!qr) && pairingCode && phoneNumber && !naze.authState.creds.registered && !pairingStarted) {
+if ((connection === 'connecting' || !!qr) && pairingCode && phoneNumber && !naze.authState.creds.registered && !pairingStarted) {
     setTimeout(async () => {
         pairingStarted = true;
         console.log('Requesting Pairing Code...')
@@ -361,5 +361,6 @@ fs.watchFile(file, () => {
 	delete require.cache[file]
 	require(file)
 });
+
 
 
