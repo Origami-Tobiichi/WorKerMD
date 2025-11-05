@@ -26,9 +26,29 @@ const question = (text) => new Promise((resolve) => rl.question(text, resolve))
 let pairingStarted = false;
 let phoneNumber;
 
-// Global variables untuk pairing code
+// Global variables untuk web dashboard
+global.botStatus = 'Initializing...';
+global.connectionStatus = 'disconnected';
+global.qrCode = null;
+global.botInfo = null;
 global.pairingCode = null;
-global.lastPairingTime = null;
+global.phoneNumber = null;
+
+// Fungsi untuk update status web
+function updateWebStatus(status, connection = null, qr = null, info = null, pairing = null, phone = null) {
+    try {
+        if (status) global.botStatus = status;
+        if (connection) global.connectionStatus = connection;
+        if (qr) global.qrCode = qr;
+        if (info) global.botInfo = info;
+        if (pairing) global.pairingCode = pairing;
+        if (phone) global.phoneNumber = phone;
+        
+        console.log(chalk.blue(`[WEB] Status Updated: ${status} | Connection: ${connection}`));
+    } catch (e) {
+        console.log(chalk.red('Error updating web status:'), e);
+    }
+}
 
 const userInfoSyt = () => {
 	try {
@@ -49,6 +69,7 @@ const database = dataBase(global.tempatDB);
 const msgRetryCounterCache = new NodeCache();
 
 assertInstalled(process.platform === 'win32' ? 'where ffmpeg' : 'command -v ffmpeg', 'FFmpeg', 0);
+//assertInstalled(process.platform === 'win32' ? 'where magick' : 'command -v convert', 'ImageMagick', 0);
 console.log(chalk.greenBright('✅  All external dependencies are satisfied'));
 console.log(chalk.green.bold(`╔═════[${`${chalk.cyan(userInfoSyt())}@${chalk.cyan(os.hostname())}`}]═════`));
 print('OS', `${os.platform()} ${os.release()} ${os.arch()}`);
@@ -61,8 +82,72 @@ print('Node.js', process.version);
 print('Baileys', `v${require('./package.json').dependencies.baileys}`);
 print('Date & Time', new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta', hour12: false }));
 console.log(chalk.green.bold('╚' + ('═'.repeat(30))));
+
+// Update server untuk support EJS
+const express = require('express');
+const ejs = require('ejs');
+const packageInfo = require('./package.json');
+
+// Set view engine to EJS
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json());
+
+// Routes untuk web dashboard
+app.get('/', (req, res) => {
+    res.render('index', {
+        bot_name: packageInfo.name,
+        version: packageInfo.version,
+        author: packageInfo.author,
+        description: packageInfo.description,
+        botStatus: global.botStatus,
+        connectionStatus: global.connectionStatus,
+        qrCode: global.qrCode,
+        botInfo: global.botInfo,
+        pairingCode: global.pairingCode,
+        phoneNumber: global.phoneNumber,
+        uptime: process.uptime()
+    });
+});
+
+app.get('/api/status', (req, res) => {
+    res.json({
+        bot_name: packageInfo.name,
+        version: packageInfo.version,
+        author: packageInfo.author,
+        description: packageInfo.description,
+        status: global.botStatus,
+        connection_status: global.connectionStatus,
+        bot_info: global.botInfo,
+        has_qr: !!global.qrCode,
+        pairing_code: global.pairingCode,
+        phone_number: global.phoneNumber,
+        uptime: Math.floor(process.uptime())
+    });
+});
+
+app.get('/qr', (req, res) => {
+    if (global.qrCode) {
+        res.setHeader('content-type', 'image/png');
+        res.end(global.qrCode);
+    } else {
+        res.status(404).json({ error: 'QR code not available' });
+    }
+});
+
+app.get('/api/restart', (req, res) => {
+    if (process.send) {
+        process.send('reset');
+        res.json({ status: 'success', message: 'Restart command sent' });
+    } else {
+        res.status(500).json({ status: 'error', message: 'Process not running with IPC' });
+    }
+});
+
 server.listen(PORT, () => {
 	console.log('App listened on port', PORT);
+    console.log(chalk.green(`🌐 Web Dashboard available at: http://localhost:${PORT}`));
 });
 
 /*
@@ -164,106 +249,57 @@ async function startNazeBot() {
 		},
 	})
 	
-	// Auto-set phone number jika tersedia di config
 	if (pairingCode && !phoneNumber && !naze.authState.creds.registered) {
-		if (global.number_bot) {
-			phoneNumber = global.number_bot.replace(/[^0-9]/g, '');
-			console.log(chalk.blue('📱 Using bot number from config:'), chalk.green(phoneNumber));
-		} else {
-			async function getPhoneNumber() {
-				phoneNumber = process.env.BOT_NUMBER || await question('Please type your WhatsApp number : ');
-				phoneNumber = phoneNumber.replace(/[^0-9]/g, '')
-				
-				if (!parsePhoneNumber('+' + phoneNumber).valid && phoneNumber.length < 6) {
-					console.log(chalk.bgBlack(chalk.redBright('Start with your Country WhatsApp code') + chalk.whiteBright(',') + chalk.greenBright(' Example : 62xxx')));
-					await getPhoneNumber()
-				}
+		async function getPhoneNumber() {
+			phoneNumber = global.number_bot ? global.number_bot : process.env.BOT_NUMBER || await question('Please type your WhatsApp number : ');
+			phoneNumber = phoneNumber.replace(/[^0-9]/g, '')
+			
+			if (!parsePhoneNumber('+' + phoneNumber).valid && phoneNumber.length < 6) {
+				console.log(chalk.bgBlack(chalk.redBright('Start with your Country WhatsApp code') + chalk.whiteBright(',') + chalk.greenBright(' Example : 62xxx')));
+				await getPhoneNumber()
 			}
+		}
+		(async () => {
 			await getPhoneNumber();
-		}
-		
-		if (phoneNumber) {
-			console.log('Phone number captured. Waiting for Connection...\n' + chalk.blueBright('Estimated time: around 2 ~ 5 minutes'));
-		}
+			await exec('rm -rf ./nazedev/*');
+			console.log('Phone number captured. Waiting for Connection...\n' + chalk.blueBright('Estimated time: around 2 ~ 5 minutes'))
+            updateWebStatus('Phone Number Captured', 'connecting', null, null, null, phoneNumber);
+		})()
 	}
-
+	
 	await Solving(naze, store)
 	
 	naze.ev.on('creds.update', saveCreds)
 	
-	// Pairing Code Handler - VERSI DIPERBAIKI
 	naze.ev.on('connection.update', async (update) => {
-		const { qr, connection, lastDisconnect, isNewLogin, receivedPendingNotifications } = update;
+		const { qr, connection, lastDisconnect, isNewLogin, receivedPendingNotifications } = update
 		
-		if (!naze.authState.creds.registered) {
-			console.log('Connection: ', connection || false);
-		}
-
-		// GENERATE PAIRING CODE - LOGIC YANG DIPERBAIKI
-		if ((connection === 'connecting' || connection === 'open') && 
-			pairingCode && 
-			phoneNumber && 
-			!naze.authState.creds.registered && 
-			!pairingStarted) {
-			
-			pairingStarted = true;
-			console.log(chalk.blue('🔑 Starting pairing code process...'));
-			
+		// Update web status
+        if (connection === 'connecting') {
+            updateWebStatus('Connecting to WhatsApp...', 'connecting');
+        } else if (connection === 'open') {
+            updateWebStatus('Connected successfully!', 'online', null, naze.user);
+        } else if (connection === 'close') {
+            updateWebStatus('Disconnected', 'offline');
+        }
+		
+		if (!naze.authState.creds.registered) console.log('Connection: ', connection || false);
+		if ((connection === 'connecting' || !!qr) && pairingCode && phoneNumber && !naze.authState.creds.registered && !pairingStarted) {
 			setTimeout(async () => {
-				try {
-					console.log(chalk.blue('📞 Requesting pairing code from WhatsApp...'));
-					let code = await naze.requestPairingCode(phoneNumber);
-					
-					if (code) {
-						console.log(chalk.green('✅ Pairing Code Generated:'), chalk.bold.white(code));
-						console.log(chalk.yellow('⏰ Expires in 15 seconds'));
-						
-						// Simpan di global variable
-						global.pairingCode = code;
-						global.lastPairingTime = Date.now();
-						
-						// Kirim ke web server
-						try {
-							const response = await axios.get(`http://localhost:${PORT}/set-pairing-code?code=${code}`, {
-								timeout: 3000
-							});
-							
-							if (response.data && response.data.success) {
-								console.log(chalk.green('🌐 Pairing code sent to web interface successfully'));
-								
-								// Juga kirim ke endpoint generate untuk web form
-								try {
-									await axios.post(`http://localhost:${PORT}/generate-pairing-code`, {
-										number: phoneNumber,
-										code: code
-									}, {
-										timeout: 2000
-									});
-								} catch (e) {
-									// Ignore error untuk endpoint ini
-								}
-							} else {
-								console.log(chalk.yellow('⚠️  Web server responded but failed to save pairing code'));
-							}
-						} catch (webError) {
-							console.log(chalk.yellow('⚠️  Web server not available, but pairing code is ready:'), chalk.bold.green(code));
-							console.log(chalk.yellow('   Use this code in your WhatsApp app to pair your device'));
-						}
-					}
-				} catch (error) {
-					console.log(chalk.red('❌ Failed to generate pairing code:'), error.message);
-					console.log(chalk.yellow('🔄 Retrying in 10 seconds...'));
-					pairingStarted = false; // Reset untuk coba lagi
-					
-					setTimeout(() => {
-						if (!naze.authState.creds.registered) {
-							pairingStarted = false;
-						}
-					}, 10000);
-				}
-			}, 3000);
+				pairingStarted = true;
+				console.log('Requesting Pairing Code...')
+				let code = await naze.requestPairingCode(phoneNumber);
+				console.log(chalk.blue('Your Pairing Code :'), chalk.green(code), '\n', chalk.yellow('Expires in 15 second'));
+                
+                // Update web dengan pairing code
+                updateWebStatus('Pairing Code Ready', 'pairing', null, null, code, phoneNumber);
+                
+                // Hapus pairing code setelah 15 detik
+                setTimeout(() => {
+                    updateWebStatus('Pairing Code Expired', 'connecting', null, null, null, phoneNumber);
+                }, 15000);
+			}, 3000)
 		}
-		
 		if (connection === 'close') {
 			const reason = new Boom(lastDisconnect?.error)?.output.statusCode
 			if (reason === DisconnectReason.connectionLost) {
@@ -299,7 +335,6 @@ async function startNazeBot() {
 				naze.end(`Unknown DisconnectReason : ${reason}|${connection}`)
 			}
 		}
-		
 		if (connection == 'open') {
 			console.log('Connected to : ' + JSON.stringify(naze.user, null, 2));
 			let botNumber = await naze.decodeJid(naze.user.id);
@@ -309,57 +344,28 @@ async function startNazeBot() {
 					db.set[botNumber].join = true
 				}
 			}
-			
-			// Clear pairing code setelah berhasil connect
-			if (global.pairingCode) {
-				console.log(chalk.green('✅ Connection established, clearing pairing code'));
-				global.pairingCode = null;
-				global.lastPairingTime = null;
-				
-				// Clear pairing code di web server juga
-				try {
-					await axios.get(`http://localhost:${PORT}/clear-pairing-code`, {
-						timeout: 2000
-					});
-				} catch (e) {
-					// Ignore error
-				}
-			}
 		}
-		
 		if (qr) {
 			if (!pairingCode) {
-				qrcode.generate(qr, { small: true })
-			}
+                qrcode.generate(qr, { small: true })
+                // Convert QR untuk web
+                toBuffer(qr).then(buffer => {
+                    updateWebStatus('QR Code Ready - Scan to Connect', 'qr_ready', buffer);
+                }).catch(e => {
+                    console.log('Error generating QR buffer:', e);
+                });
+            }
 			app.use('/qr', async (req, res) => {
 				res.setHeader('content-type', 'image/png')
 				res.end(await toBuffer(qr))
 			});
 		}
-		
 		if (isNewLogin) console.log(chalk.green('New device login detected...'))
 		if (receivedPendingNotifications == 'true') {
 			console.log('Please wait About 1 Minute...')
 			naze.ev.flush()
 		}
 	});
-	
-	// Debug pairing code status setiap 15 detik
-	const pairingDebugInterval = setInterval(() => {
-		if (pairingCode && phoneNumber && !naze?.authState?.creds?.registered) {
-			console.log(chalk.blue('🔍 Pairing Debug:'), 
-				'Number:', phoneNumber, 
-				'| Started:', pairingStarted,
-				'| Registered:', naze.authState.creds.registered,
-				'| Code:', global.pairingCode || 'None'
-			);
-		}
-		
-		// Clear interval jika sudah terdaftar
-		if (naze.authState.creds.registered) {
-			clearInterval(pairingDebugInterval);
-		}
-	}, 15000);
 	
 	naze.ev.on('contacts.update', (update) => {
 		for (let contact of update) {
