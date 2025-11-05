@@ -1,197 +1,99 @@
 const express = require('express');
+const { createServer } = require('http');
 const path = require('path');
+
 const app = express();
-const server = require('http').createServer(app);
-const PORT = process.env.PORT || 8000;
+const server = createServer(app);
+const PORT = process.env.PORT || process.env.SERVER_PORT || 3000;
+const packageInfo = require('./package.json');
 
-// Middleware untuk parsing
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Set view engine ke EJS
+// Set view engine to EJS
 app.set('view engine', 'ejs');
-app.set('views', path.join(process.cwd(), 'views'));
+app.set('views', path.join(__dirname, 'views'));
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json());
 
-// Static files
-app.use(express.static(path.join(process.cwd(), 'public')));
+// Global variables untuk status bot
+global.botStatus = 'Initializing...';
+global.qrCode = null;
+global.botInfo = null;
+global.connectionStatus = 'disconnected';
+global.pairingCode = null;
+global.phoneNumber = null;
 
-// Data untuk template EJS
-const packageInfo = {
-    name: 'hitori',
-    version: '1.0.8',
-    author: 'Mazeker',
-    description: 'Bot WhatsApp Using Lib Balloys Multi worker'
-};
-
-// State management untuk pairing
-const pairingState = {
-    code: null,
-    timestamp: null,
-    status: 'waiting', // waiting, scanning, paired, expired
-    qrCode: null
+// Helper function untuk update status
+global.updateBotStatus = function(status, connection = null, qr = null, botInfo = null, pairing = null, phone = null) {
+    global.botStatus = status;
+    if (connection) global.connectionStatus = connection;
+    if (qr) global.qrCode = qr;
+    if (botInfo) global.botInfo = botInfo;
+    if (pairing) global.pairingCode = pairing;
+    if (phone) global.phoneNumber = phone;
 };
 
 // Routes
 app.get('/', (req, res) => {
-    res.render('index', { 
-        title: 'Naze Bot',
-        port: PORT,
-        packageInfo: packageInfo,
+    res.render('index', {
         bot_name: packageInfo.name,
         version: packageInfo.version,
         author: packageInfo.author,
         description: packageInfo.description,
-        uptime: '2311 second',
-        pairingCode: pairingState.code,
-        pairingStatus: pairingState.status
+        botStatus: global.botStatus,
+        connectionStatus: global.connectionStatus,
+        qrCode: global.qrCode,
+        botInfo: global.botInfo,
+        pairingCode: global.pairingCode,
+        phoneNumber: global.phoneNumber,
+        uptime: process.uptime()
     });
 });
 
-// Endpoint untuk QR Code (jika menggunakan QR)
-app.get('/qr', async (req, res) => {
-    try {
-        if (pairingState.qrCode) {
-            res.setHeader('content-type', 'image/png');
-            res.send(pairingState.qrCode);
-        } else {
-            res.status(404).send('QR not available');
-        }
-    } catch (error) {
-        res.status(404).send('QR not available');
-    }
+app.get('/api/status', (req, res) => {
+    res.json({
+        bot_name: packageInfo.name,
+        version: packageInfo.version,
+        author: packageInfo.author,
+        description: packageInfo.description,
+        status: global.botStatus,
+        connection_status: global.connectionStatus,
+        bot_info: global.botInfo,
+        has_qr: !!global.qrCode,
+        pairing_code: global.pairingCode,
+        phone_number: global.phoneNumber,
+        uptime: Math.floor(process.uptime())
+    });
 });
 
-// Endpoint untuk set pairing code (dipanggil oleh bot)
-app.post('/set-pairing-code', (req, res) => {
-    const { code, status = 'waiting', qrCode = null } = req.body;
-    
-    if (code) {
-        pairingState.code = code;
-        pairingState.timestamp = new Date();
-        pairingState.status = status;
-        pairingState.qrCode = qrCode;
-        
-        console.log('Pairing code received:', code, 'Status:', status);
-        
-        // Auto expire setelah 5 menit
-        setTimeout(() => {
-            if (pairingState.code === code && pairingState.status !== 'paired') {
-                pairingState.status = 'expired';
-                console.log('Pairing code expired:', code);
-            }
-        }, 5 * 60 * 1000);
-        
-        res.json({ 
-            success: true, 
-            code: code,
-            status: status,
-            timestamp: pairingState.timestamp
-        });
+app.get('/qr', (req, res) => {
+    if (global.qrCode) {
+        res.setHeader('content-type', 'image/png');
+        res.end(global.qrCode);
     } else {
-        res.status(400).json({ 
-            success: false, 
-            error: 'No code provided' 
-        });
+        res.status(404).json({ error: 'QR code not available' });
     }
 });
 
-// Endpoint untuk update status pairing
-app.post('/update-pairing-status', (req, res) => {
-    const { status, code } = req.body;
-    
-    if (pairingState.code === code || code === undefined) {
-        pairingState.status = status;
-        console.log('Pairing status updated:', status, 'for code:', code || pairingState.code);
-        
-        res.json({ 
-            success: true, 
-            status: status,
-            code: pairingState.code
-        });
+app.get('/api/restart', (req, res) => {
+    if (process.send) {
+        process.send('reset');
+        res.json({ status: 'success', message: 'Restart command sent' });
     } else {
-        res.status(400).json({ 
-            success: false, 
-            error: 'Invalid code or no active pairing session' 
-        });
+        res.status(500).json({ status: 'error', message: 'Process not running with IPC' });
     }
 });
 
-// Endpoint untuk get pairing code (dipanggil oleh frontend)
-app.get('/get-pairing-code', (req, res) => {
-    res.json({ 
-        code: pairingState.code,
-        status: pairingState.status,
-        timestamp: pairingState.timestamp,
-        expiresIn: pairingState.timestamp ? 
-            Math.max(0, 5 * 60 * 1000 - (new Date() - pairingState.timestamp)) : 0
-    });
-});
-
-// Endpoint untuk reset pairing
-app.post('/reset-pairing', (req, res) => {
-    pairingState.code = null;
-    pairingState.timestamp = null;
-    pairingState.status = 'waiting';
-    pairingState.qrCode = null;
-    
-    console.log('Pairing reset');
-    res.json({ success: true, message: 'Pairing reset successfully' });
-});
-
-// WebSocket atau SSE untuk real-time updates (opsional)
-app.get('/pairing-events', (req, res) => {
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    
-    // Send initial state
-    res.write(`data: ${JSON.stringify(pairingState)}\n\n`);
-    
-    // Check for updates every second
-    const interval = setInterval(() => {
-        res.write(`data: ${JSON.stringify(pairingState)}\n\n`);
-    }, 1000);
-    
-    req.on('close', () => {
-        clearInterval(interval);
-        res.end();
-    });
-});
-
-// Status page
-app.get('/status', (req, res) => {
-    res.json({ 
-        status: 'Bot is running', 
-        port: PORT,
-        pairing: pairingState
-    });
-});
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-    res.status(200).json({ 
-        status: 'OK', 
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
-        pairing: {
-            hasActivePairing: pairingState.code !== null,
-            status: pairingState.status
-        }
-    });
-});
-
-// Error handling
-app.use((err, req, res, next) => {
-    if (err.message.includes('Failed to lookup view')) {
-        return res.json({
-            status: 'Bot is running',
-            message: 'Web interface not available, but bot is functional',
-            port: PORT,
-            pairing: pairingState
-        });
+app.post('/api/send-message', (req, res) => {
+    const { to, message } = req.body;
+    if (!to || !message) {
+        return res.status(400).json({ error: 'Missing to or message' });
     }
-    next(err);
+    
+    if (process.send) {
+        process.send(`send_message:${to}:${message}`);
+        res.json({ status: 'success', message: 'Message sent to process' });
+    } else {
+        res.status(500).json({ error: 'Process not running with IPC' });
+    }
 });
 
-// HANYA ekspor app, jangan start server di sini
-module.exports = { app, PORT, pairingState };
+module.exports = { app, server, PORT };
