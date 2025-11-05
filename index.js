@@ -201,14 +201,22 @@ if ((connection === 'connecting' || !!qr) && pairingCode && phoneNumber && !naze
 	naze.ev.on('connection.update', async (update) => {
 		const { qr, connection, lastDisconnect, isNewLogin, receivedPendingNotifications } = update
 		if (!naze.authState.creds.registered) console.log('Connection: ', connection || false);
-		if ((connection === 'connecting' || !!qr) && pairingCode && phoneNumber && !naze.authState.creds.registered && !pairingStarted) {
-			setTimeout(async () => {
-				pairingStarted = true;
-				console.log('Requesting Pairing Code...')
-				let code = await naze.requestPairingCode(phoneNumber);
-				console.log(chalk.blue('Your Pairing Code :'), chalk.green(code), '\n', chalk.yellow('Expires in 15 second'));
-			}, 3000)
-		}
+		// HAPUS kode ini (sekitar baris 181):
+if ((connection === 'connecting' || !!qr) && pairingCode && phoneNumber && !naze.authState.creds.registered && !pairingStarted) {
+    setTimeout(async () => {
+        pairingStarted = true;
+        console.log('Requesting Pairing Code...')
+        let code = await naze.requestPairingCode(phoneNumber);
+        console.log(chalk.blue('Your Pairing Code :'), chalk.green(code), '\n', chalk.yellow('Expires in 15 second'));
+        
+        // Kirim pairing code ke server web
+        try {
+            await axios.get(`http://localhost:${PORT}/set-pairing-code?code=${code}`);
+        } catch (e) {
+            console.log('Failed to send pairing code to web server');
+        }
+    }, 3000)
+}
 		if (connection === 'close') {
 			const reason = new Boom(lastDisconnect?.error)?.output.statusCode
 			if (reason === DisconnectReason.connectionLost) {
@@ -361,6 +369,7 @@ fs.watchFile(file, () => {
 	delete require.cache[file]
 	require(file)
 });
+
 
 
 
