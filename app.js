@@ -1,8 +1,9 @@
-// app.js - Gabungan server.js dan start.js
+// app.js - File utama yang menggabungkan server dan start
 const express = require('express');
 const path = require('path');
+const http = require('http');
+
 const app = express();
-const server = require('http').createServer(app);
 const PORT = process.env.PORT || 8000;
 
 // Middleware untuk parsing
@@ -11,10 +12,10 @@ app.use(express.urlencoded({ extended: true }));
 
 // Set view engine ke EJS
 app.set('view engine', 'ejs');
-app.set('views', path.join(process.cwd(), 'views'));
+app.set('views', path.join(__dirname, 'views'));
 
 // Static files
-app.use(express.static(path.join(process.cwd(), 'public')));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Data untuk template EJS
 const packageInfo = {
@@ -68,7 +69,8 @@ app.get('/status', (req, res) => {
     res.json({ 
         status: 'Bot is running', 
         port: PORT,
-        pairingCode: global.pairingCode || null
+        pairingCode: global.pairingCode || null,
+        packageInfo: packageInfo
     });
 });
 
@@ -77,27 +79,50 @@ app.get('/health', (req, res) => {
     res.status(200).json({ 
         status: 'OK', 
         timestamp: new Date().toISOString(),
-        uptime: process.uptime()
+        uptime: process.uptime(),
+        packageInfo: packageInfo
     });
 });
 
-// Error handling
+// Error handling untuk view tidak ditemukan
 app.use((err, req, res, next) => {
     if (err.message.includes('Failed to lookup view')) {
         return res.json({
             status: 'Bot is running',
             message: 'Web interface not available, but bot is functional',
             port: PORT,
-            pairingCode: global.pairingCode || null
+            pairingCode: global.pairingCode || null,
+            packageInfo: packageInfo
         });
     }
     next(err);
 });
 
+// Route fallback untuk semua request lainnya
+app.use('*', (req, res) => {
+    res.json({
+        status: 'Bot is running',
+        message: 'Server is working correctly',
+        port: PORT,
+        endpoints: {
+            home: '/',
+            status: '/status',
+            health: '/health',
+            getPairingCode: '/get-pairing-code',
+            setPairingCode: '/set-pairing-code?code=YOUR_CODE'
+        }
+    });
+});
+
+// Create server
+const server = http.createServer(app);
+
 // Start server
 server.listen(PORT, () => {
     console.log(`🚀 App running on port ${PORT}`);
     console.log(`📱 Access your bot at: http://localhost:${PORT}`);
+    console.log(`🩺 Health check at: http://localhost:${PORT}/health`);
+    console.log(`📊 Status at: http://localhost:${PORT}/status`);
 });
 
 // Handle graceful shutdown
@@ -123,3 +148,5 @@ process.on('uncaughtException', (error) => {
 process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
+
+module.exports = app;
