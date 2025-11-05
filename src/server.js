@@ -13,23 +13,13 @@ app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// Global variables untuk status bot
+// Global variables untuk web dashboard
 global.botStatus = 'Initializing...';
+global.connectionStatus = 'disconnected';
 global.qrCode = null;
 global.botInfo = null;
-global.connectionStatus = 'disconnected';
 global.pairingCode = null;
 global.phoneNumber = null;
-
-// Helper function untuk update status
-global.updateBotStatus = function(status, connection = null, qr = null, botInfo = null, pairing = null, phone = null) {
-    global.botStatus = status;
-    if (connection) global.connectionStatus = connection;
-    if (qr) global.qrCode = qr;
-    if (botInfo) global.botInfo = botInfo;
-    if (pairing) global.pairingCode = pairing;
-    if (phone) global.phoneNumber = phone;
-};
 
 // Routes
 app.get('/', (req, res) => {
@@ -79,20 +69,6 @@ app.get('/api/restart', (req, res) => {
         res.json({ status: 'success', message: 'Restart command sent' });
     } else {
         res.status(500).json({ status: 'error', message: 'Process not running with IPC' });
-    }
-});
-
-app.post('/api/send-message', (req, res) => {
-    const { to, message } = req.body;
-    if (!to || !message) {
-        return res.status(400).json({ error: 'Missing to or message' });
-    }
-    
-    if (process.send) {
-        process.send(`send_message:${to}:${message}`);
-        res.json({ status: 'success', message: 'Message sent to process' });
-    } else {
-        res.status(500).json({ error: 'Process not running with IPC' });
     }
 });
 
