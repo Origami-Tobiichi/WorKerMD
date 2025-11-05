@@ -178,13 +178,6 @@ async function startNazeBot() {
 		})()
 	}
 	// Di bagian yang menghasilkan pairing code, tambahkan:
-if ((connection === 'connecting' || !!qr) && pairingCode && phoneNumber && !naze.authState.creds.registered && !pairingStarted) {
-    setTimeout(async () => {
-        pairingStarted = true;
-        console.log('Requesting Pairing Code...')
-        let code = await naze.requestPairingCode(phoneNumber);
-        console.log(chalk.blue('Your Pairing Code :'), chalk.green(code), '\n', chalk.yellow('Expires in 15 second'));
-        
         // Kirim pairing code ke server web
         try {
             await axios.get(`http://localhost:${PORT}/set-pairing-code?code=${code}`);
@@ -369,6 +362,7 @@ fs.watchFile(file, () => {
 	delete require.cache[file]
 	require(file)
 });
+
 
 
 
