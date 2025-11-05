@@ -6,22 +6,21 @@ WORKDIR /app
 RUN apk update && apk add --no-cache \
     ffmpeg \
     imagemagick \
-    libwebp \
     libwebp-tools \
     python3 \
     make \
     g++ \
     git \
-    curl \
-    && rm -rf /var/cache/apk/*
+    curl
 
 # Copy package files
 COPY package*.json ./
 
+# Fix cheerio version jika masih ada masalah (opsional - backup)
+RUN sed -i 's/"cheerio": "^1.0.-rc.10"/"cheerio": "^1.0.0-rc.10"/g' package.json
+
 # Install npm dependencies
-RUN npm config set registry https://registry.npmjs.org/ \
-    && npm install --legacy-peer-deps --production \
-    && npm cache clean --force
+RUN npm install --legacy-peer-deps --omit=dev
 
 # Copy source code
 COPY . .
@@ -29,14 +28,11 @@ COPY . .
 # Create necessary directories
 RUN mkdir -p views nazedev
 
-# Fix permissions
-RUN chmod -R 755 /app
-
 EXPOSE 3000
 
-# Health check
+# Health check menggunakan curl
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
+    CMD curl -f http://localhost:3000/ || exit 1
 
 # Start application
 CMD ["npm", "start"]
