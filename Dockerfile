@@ -1,21 +1,19 @@
-FROM node:18-bullseye-slim
+FROM node:18-alpine
 
 WORKDIR /app
 
-# Install system dependencies untuk Debian slim
-RUN apt-get update && \
-    apt-get install -y \
+# Install system dependencies untuk Alpine Linux
+RUN apk update && apk add --no-cache \
     ffmpeg \
     imagemagick \
-    webp \
+    libwebp \
+    libwebp-tools \
     python3 \
     make \
     g++ \
     git \
     curl \
-    wget \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/cache/apk/*
 
 # Copy package files
 COPY package*.json ./
@@ -36,7 +34,9 @@ RUN chmod -R 755 /app
 
 EXPOSE 3000
 
+# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:3000/ || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
 
+# Start application
 CMD ["npm", "start"]
