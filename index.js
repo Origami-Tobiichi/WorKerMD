@@ -26,6 +26,10 @@ const question = (text) => new Promise((resolve) => rl.question(text, resolve))
 let pairingStarted = false;
 let phoneNumber;
 
+// Global variables untuk pairing code
+global.pairingCode = null;
+global.lastPairingTime = null;
+
 const userInfoSyt = () => {
 	try {
 		return os.userInfo().username
@@ -45,7 +49,6 @@ const database = dataBase(global.tempatDB);
 const msgRetryCounterCache = new NodeCache();
 
 assertInstalled(process.platform === 'win32' ? 'where ffmpeg' : 'command -v ffmpeg', 'FFmpeg', 0);
-//assertInstalled(process.platform === 'win32' ? 'where magick' : 'command -v convert', 'ImageMagick', 0);
 console.log(chalk.greenBright('✅  All external dependencies are satisfied'));
 console.log(chalk.green.bold(`╔═════[${`${chalk.cyan(userInfoSyt())}@${chalk.cyan(os.hostname())}`}]═════`));
 print('OS', `${os.platform()} ${os.release()} ${os.arch()}`);
@@ -161,46 +164,106 @@ async function startNazeBot() {
 		},
 	})
 	
+	// Auto-set phone number jika tersedia di config
 	if (pairingCode && !phoneNumber && !naze.authState.creds.registered) {
-		async function getPhoneNumber() {
-			phoneNumber = global.number_bot ? global.number_bot : process.env.BOT_NUMBER || await question('Please type your WhatsApp number : ');
-			phoneNumber = phoneNumber.replace(/[^0-9]/g, '')
-			
-			if (!parsePhoneNumber('+' + phoneNumber).valid && phoneNumber.length < 6) {
-				console.log(chalk.bgBlack(chalk.redBright('Start with your Country WhatsApp code') + chalk.whiteBright(',') + chalk.greenBright(' Example : 62xxx')));
-				await getPhoneNumber()
+		if (global.number_bot) {
+			phoneNumber = global.number_bot.replace(/[^0-9]/g, '');
+			console.log(chalk.blue('📱 Using bot number from config:'), chalk.green(phoneNumber));
+		} else {
+			async function getPhoneNumber() {
+				phoneNumber = process.env.BOT_NUMBER || await question('Please type your WhatsApp number : ');
+				phoneNumber = phoneNumber.replace(/[^0-9]/g, '')
+				
+				if (!parsePhoneNumber('+' + phoneNumber).valid && phoneNumber.length < 6) {
+					console.log(chalk.bgBlack(chalk.redBright('Start with your Country WhatsApp code') + chalk.whiteBright(',') + chalk.greenBright(' Example : 62xxx')));
+					await getPhoneNumber()
+				}
 			}
-		}
-		(async () => {
 			await getPhoneNumber();
-			await exec('rm -rf ./nazedev/*');
-			console.log('Phone number captured. Waiting for Connection...\n' + chalk.blueBright('Estimated time: around 2 ~ 5 minutes'))
-		})()
+		}
+		
+		if (phoneNumber) {
+			console.log('Phone number captured. Waiting for Connection...\n' + chalk.blueBright('Estimated time: around 2 ~ 5 minutes'));
+		}
 	}
 
 	await Solving(naze, store)
 	
 	naze.ev.on('creds.update', saveCreds)
 	
+	// Pairing Code Handler - VERSI DIPERBAIKI
 	naze.ev.on('connection.update', async (update) => {
-		const { qr, connection, lastDisconnect, isNewLogin, receivedPendingNotifications } = update
-		if (!naze.authState.creds.registered) console.log('Connection: ', connection || false);
-		// HAPUS kode ini (sekitar baris 181):
-if ((connection === 'connecting' || !!qr) && pairingCode && phoneNumber && !naze.authState.creds.registered && !pairingStarted) {
-    setTimeout(async () => {
-        pairingStarted = true;
-        console.log('Requesting Pairing Code...')
-        let code = await naze.requestPairingCode(phoneNumber);
-        console.log(chalk.blue('Your Pairing Code :'), chalk.green(code), '\n', chalk.yellow('Expires in 15 second'));
-        
-        // Kirim pairing code ke server web
-        try {
-            await axios.get(`http://localhost:${PORT}/set-pairing-code?code=${code}`);
-        } catch (e) {
-            console.log('Failed to send pairing code to web server');
-        }
-    }, 3000)
-}
+		const { qr, connection, lastDisconnect, isNewLogin, receivedPendingNotifications } = update;
+		
+		if (!naze.authState.creds.registered) {
+			console.log('Connection: ', connection || false);
+		}
+
+		// GENERATE PAIRING CODE - LOGIC YANG DIPERBAIKI
+		if ((connection === 'connecting' || connection === 'open') && 
+			pairingCode && 
+			phoneNumber && 
+			!naze.authState.creds.registered && 
+			!pairingStarted) {
+			
+			pairingStarted = true;
+			console.log(chalk.blue('🔑 Starting pairing code process...'));
+			
+			setTimeout(async () => {
+				try {
+					console.log(chalk.blue('📞 Requesting pairing code from WhatsApp...'));
+					let code = await naze.requestPairingCode(phoneNumber);
+					
+					if (code) {
+						console.log(chalk.green('✅ Pairing Code Generated:'), chalk.bold.white(code));
+						console.log(chalk.yellow('⏰ Expires in 15 seconds'));
+						
+						// Simpan di global variable
+						global.pairingCode = code;
+						global.lastPairingTime = Date.now();
+						
+						// Kirim ke web server
+						try {
+							const response = await axios.get(`http://localhost:${PORT}/set-pairing-code?code=${code}`, {
+								timeout: 3000
+							});
+							
+							if (response.data && response.data.success) {
+								console.log(chalk.green('🌐 Pairing code sent to web interface successfully'));
+							} else {
+								console.log(chalk.yellow('⚠️  Web server responded but failed to save pairing code'));
+							}
+						} catch (webError) {
+							console.log(chalk.yellow('⚠️  Web server not available, but pairing code is ready:'), chalk.bold.green(code));
+							console.log(chalk.yellow('   Use this code in your WhatsApp app to pair your device'));
+						}
+						
+						// Juga coba kirim ke endpoint generate
+						try {
+							await axios.post(`http://localhost:${PORT}/generate-pairing-code`, {
+								number: phoneNumber,
+								code: code
+							}, {
+								timeout: 2000
+							});
+						} catch (e) {
+							// Ignore error untuk endpoint ini
+						}
+					}
+				} catch (error) {
+					console.log(chalk.red('❌ Failed to generate pairing code:'), error.message);
+					console.log(chalk.yellow('🔄 Retrying in 10 seconds...'));
+					pairingStarted = false; // Reset untuk coba lagi
+					
+					setTimeout(() => {
+						if (!naze.authState.creds.registered) {
+							pairingStarted = false;
+						}
+					}, 10000);
+				}
+			}, 3000);
+		}
+		
 		if (connection === 'close') {
 			const reason = new Boom(lastDisconnect?.error)?.output.statusCode
 			if (reason === DisconnectReason.connectionLost) {
@@ -236,6 +299,7 @@ if ((connection === 'connecting' || !!qr) && pairingCode && phoneNumber && !naze
 				naze.end(`Unknown DisconnectReason : ${reason}|${connection}`)
 			}
 		}
+		
 		if (connection == 'open') {
 			console.log('Connected to : ' + JSON.stringify(naze.user, null, 2));
 			let botNumber = await naze.decodeJid(naze.user.id);
@@ -245,20 +309,48 @@ if ((connection === 'connecting' || !!qr) && pairingCode && phoneNumber && !naze
 					db.set[botNumber].join = true
 				}
 			}
+			
+			// Clear pairing code setelah berhasil connect
+			if (global.pairingCode) {
+				console.log(chalk.green('✅ Connection established, clearing pairing code'));
+				global.pairingCode = null;
+				global.lastPairingTime = null;
+			}
 		}
+		
 		if (qr) {
-			if (!pairingCode) qrcode.generate(qr, { small: true })
+			if (!pairingCode) {
+				qrcode.generate(qr, { small: true })
+			}
 			app.use('/qr', async (req, res) => {
 				res.setHeader('content-type', 'image/png')
 				res.end(await toBuffer(qr))
 			});
 		}
+		
 		if (isNewLogin) console.log(chalk.green('New device login detected...'))
 		if (receivedPendingNotifications == 'true') {
 			console.log('Please wait About 1 Minute...')
 			naze.ev.flush()
 		}
 	});
+	
+	// Debug pairing code status setiap 15 detik
+	const pairingDebugInterval = setInterval(() => {
+		if (pairingCode && phoneNumber && !naze?.authState?.creds?.registered) {
+			console.log(chalk.blue('🔍 Pairing Debug:'), 
+				'Number:', phoneNumber, 
+				'| Started:', pairingStarted,
+				'| Registered:', naze.authState.creds.registered,
+				'| Code:', global.pairingCode || 'None'
+			);
+		}
+		
+		// Clear interval jika sudah terdaftar
+		if (naze.authState.creds.registered) {
+			clearInterval(pairingDebugInterval);
+		}
+	}, 15000);
 	
 	naze.ev.on('contacts.update', (update) => {
 		for (let contact of update) {
@@ -353,9 +445,3 @@ fs.watchFile(file, () => {
 	delete require.cache[file]
 	require(file)
 });
-
-
-
-
-
-
