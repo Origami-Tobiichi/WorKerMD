@@ -2,12 +2,13 @@
   "name": "hitori",
   "version": "1.0.8",
   "description": "Bot WhatsApp Using Lib Baileys Multi Device",
-  "main": "app.js",
+  "main": "start.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node app.js",
+    "start": "node start.js",
     "dev": "nodemon index.js",
-    "debug": "DEBUG=* node app.js"
+    "debug": "DEBUG=* node start.js",
+    "web": "node index.js"
   },
   "keywords": [
     "whatsapp-bot",
@@ -25,7 +26,6 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "ejs": "^3.1.9",
     "@google/generative-ai": "^0.24.0",
     "@hapi/boom": "^10.0.0",
     "@ibaraki-douji/pixivts": "^2.4.1",
@@ -34,12 +34,13 @@
     "axios": "^0.24.0",
     "baileys": "latest",
     "chalk": "^4.1.2",
-    "cheerio": "^1.0.0-rc.10",
+    "cheerio": "^1.0.-rc.10",
     "chess.js": "^1.2.0",
     "child_process": "^1.0.2",
     "crypto": "^1.0.1",
     "crypto-js": "^4.2.0",
     "didyoumean": "^1.2.2",
+    "ejs": "^3.1.9",
     "express": "^4.18.2",
     "filesize": "^10.0.7",
     "file-type": "^16.5.3",
