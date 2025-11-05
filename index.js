@@ -230,24 +230,24 @@ async function startNazeBot() {
 							
 							if (response.data && response.data.success) {
 								console.log(chalk.green('🌐 Pairing code sent to web interface successfully'));
+								
+								// Juga kirim ke endpoint generate untuk web form
+								try {
+									await axios.post(`http://localhost:${PORT}/generate-pairing-code`, {
+										number: phoneNumber,
+										code: code
+									}, {
+										timeout: 2000
+									});
+								} catch (e) {
+									// Ignore error untuk endpoint ini
+								}
 							} else {
 								console.log(chalk.yellow('⚠️  Web server responded but failed to save pairing code'));
 							}
 						} catch (webError) {
 							console.log(chalk.yellow('⚠️  Web server not available, but pairing code is ready:'), chalk.bold.green(code));
 							console.log(chalk.yellow('   Use this code in your WhatsApp app to pair your device'));
-						}
-						
-						// Juga coba kirim ke endpoint generate
-						try {
-							await axios.post(`http://localhost:${PORT}/generate-pairing-code`, {
-								number: phoneNumber,
-								code: code
-							}, {
-								timeout: 2000
-							});
-						} catch (e) {
-							// Ignore error untuk endpoint ini
 						}
 					}
 				} catch (error) {
@@ -315,6 +315,15 @@ async function startNazeBot() {
 				console.log(chalk.green('✅ Connection established, clearing pairing code'));
 				global.pairingCode = null;
 				global.lastPairingTime = null;
+				
+				// Clear pairing code di web server juga
+				try {
+					await axios.get(`http://localhost:${PORT}/clear-pairing-code`, {
+						timeout: 2000
+					});
+				} catch (e) {
+					// Ignore error
+				}
 			}
 		}
 		
