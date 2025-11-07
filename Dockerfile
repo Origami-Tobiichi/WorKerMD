@@ -1,6 +1,6 @@
 FROM node:18-alpine
 
-# Install dependencies yang diperlukan
+# Install dependencies yang diperlukan TERMASUK GIT
 RUN apk add --no-cache \
     bash \
     curl \
@@ -8,6 +8,7 @@ RUN apk add --no-cache \
     python3 \
     make \
     g++ \
+    git \
     && rm -rf /var/cache/apk/*
 
 # Buat directory aplikasi
