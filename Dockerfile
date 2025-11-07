@@ -16,8 +16,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install --production --no-optional
+# Install dependencies dengan legacy-peer-deps
+RUN npm install --production --no-optional --legacy-peer-deps
 
 # Copy source code
 COPY . .
