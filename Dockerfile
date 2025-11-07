@@ -1,49 +1,39 @@
-# Use Node.js 20 Alpine for smaller image size
-FROM node:20-alpine
+FROM node:18-alpine
 
-# Install required system dependencies
+# Install dependencies yang diperlukan
 RUN apk add --no-cache \
     bash \
     curl \
     ffmpeg \
-    imagemagick \
     python3 \
     make \
     g++ \
-    git \
     && rm -rf /var/cache/apk/*
 
-# Create app directory
+# Buat directory aplikasi
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies (using npm install instead of npm ci)
-RUN npm install --production --no-optional --legacy-peer-deps \
-    && npm cache clean --force
+# Install dependencies
+RUN npm install --production --no-optional
 
 # Copy source code
 COPY . .
 
-# Create necessary directories
-RUN mkdir -p \
-    nazedev \
-    views \
-    src \
-    lib \
-    sessions
+# Buat directory untuk session
+RUN mkdir -p nazedev session sessions tmp
 
-# Set environment variables
-ENV NODE_ENV=production
-ENV PORT=3000
+# Set permissions
+RUN chmod -R 755 .
 
-# Expose the port
+# Expose port
 EXPOSE 3000
 
-# Health check (using wget instead of curl)
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/status || exit 1
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:3000/health || exit 1
 
-# Start the application
-CMD ["node", "start.js", "--pairing-code"]
+# Start aplikasi
+CMD ["npm", "start"]
