@@ -1,8 +1,8 @@
-# Use Node.js 20 Alpine for smaller image size
-FROM node:20-alpine
+# Alternative: Use Node.js 20 slim
+FROM node:20-slim
 
-# Install required system dependencies
-RUN apk add --no-cache \
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
     bash \
     curl \
     ffmpeg \
@@ -11,38 +11,32 @@ RUN apk add --no-cache \
     make \
     g++ \
     git \
-    && rm -rf /var/cache/apk/*
+    && rm -rf /var/lib/apt/lists/*
 
-# Create app directory
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install --production --no-optional
+# Install dependencies dengan force rebuild native modules
+RUN npm ci --production --no-optional \
+    && npm cache clean --force
 
 # Copy source code
 COPY . .
 
-# Create necessary directories
-RUN mkdir -p \
-    nazedev \
-    views \
-    src \
-    lib \
-    sessions
+# Create directories
+RUN mkdir -p nazedev views sessions
 
-# Set environment variables
+# Environment variables
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Expose the port
 EXPOSE 3000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:3000/api/status || exit 1
 
-# Start the application
+# Start application
 CMD ["node", "start.js", "--pairing-code"]
