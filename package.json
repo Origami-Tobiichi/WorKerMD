@@ -8,7 +8,10 @@
     "start": "node start.js --pairing-code",
     "dev": "nodemon index.js --pairing-code",
     "debug": "DEBUG=* node start.js --pairing-code",
-    "web": "node index.js --pairing-code"
+    "web": "node index.js --pairing-code",
+    "build": "echo 'No build required for Node.js app'",
+    "vercel-build": "yarn install",
+    "vercel-start": "node server.js"
   },
   "keywords": [
     "whatsapp-bot",
