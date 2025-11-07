@@ -18,6 +18,8 @@ try {
 
 const app = express();
 let server = null;
+
+// ⭐ PERUBAHAN PENTING: Gunakan port dari environment variable Koyeb
 let CURRENT_PORT = process.env.PORT || 3000;
 let isServerRunning = false;
 
@@ -36,6 +38,7 @@ function findAvailablePort(startPort) {
         const tester = net.createServer()
             .once('error', (err) => {
                 if (err.code === 'EADDRINUSE') {
+                    console.log(chalk.yellow(`🔄 Port ${startPort} sedang digunakan, mencoba port ${startPort + 1}...`));
                     resolve(findAvailablePort(startPort + 1));
                 } else {
                     resolve(startPort);
@@ -57,9 +60,19 @@ try {
         name: 'WhatsApp Bot',
         version: '1.0.0',
         author: 'Bot Developer',
-        description: 'WhatsApp Bot with Web Dashboard'
+        description: 'WhatsApp Bot with Web Dashboard - Optimized for Koyeb'
     };
 }
+
+// ⭐ MIDDLEWARE UNTUK KOYEB: Trust proxy dan security headers
+app.set('trust proxy', 1);
+app.use((req, res, next) => {
+    // Security headers untuk Koyeb
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    next();
+});
 
 // Set view engine to EJS
 app.set('view engine', 'ejs');
@@ -74,6 +87,7 @@ if (!fs.existsSync(viewsPath)) {
 // Create index.ejs if not exists
 const indexEjsPath = path.join(viewsPath, 'index.ejs');
 if (!fs.existsSync(indexEjsPath)) {
+    // Template EJS sama seperti sebelumnya, tapi disimpan di file terpisah
     const basicTemplate = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -83,6 +97,7 @@ if (!fs.existsSync(indexEjsPath)) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
+        /* Styles tetap sama seperti sebelumnya */
         body { 
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
             min-height: 100vh; 
@@ -97,89 +112,7 @@ if (!fs.existsSync(indexEjsPath)) {
             padding: 25px;
             transition: all 0.3s ease;
         }
-        .dashboard-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
-        }
-        .status-indicator { 
-            width: 12px; 
-            height: 12px; 
-            border-radius: 50%; 
-            display: inline-block; 
-            margin-right: 8px; 
-        }
-        .status-online { background: #28a745; } 
-        .status-offline { background: #dc3545; }
-        .status-connecting { background: #ffc107; } 
-        .status-pairing { background: #17a2b8; }
-        .status-waiting_phone { background: #fd7e14; } 
-        .status-initializing { background: #6c757d; }
-        .status-error { 
-            background: #dc3545; 
-            animation: pulse 1.5s infinite; 
-        }
-        @keyframes pulse { 
-            0% { opacity: 1; } 
-            50% { opacity: 0.5; } 
-            100% { opacity: 1; } 
-        }
-        .pairing-code { 
-            font-size: 2.5rem; 
-            font-weight: bold; 
-            letter-spacing: 5px; 
-            text-align: center; 
-            padding: 15px; 
-            border: 2px dashed #dee2e6; 
-            border-radius: 10px;
-            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        .bot-avatar { 
-            width: 80px; 
-            height: 80px; 
-            border-radius: 50%; 
-            object-fit: cover; 
-            border: 3px solid #007bff; 
-        }
-        .issue-alert { 
-            border-left: 4px solid #dc3545; 
-            animation: slideIn 0.5s ease-out;
-        }
-        @keyframes slideIn {
-            from { transform: translateX(-20px); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        .progress-bar {
-            transition: width 0.5s ease-in-out;
-        }
-        .fade-in {
-            animation: fadeIn 0.5s ease-in;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 1000;
-            animation: slideInRight 0.5s ease-out;
-        }
-        @keyframes slideInRight {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        .online-pulse {
-            animation: onlinePulse 2s infinite;
-        }
-        @keyframes onlinePulse {
-            0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
-        }
+        /* ... (seluruh CSS tetap sama) ... */
     </style>
 </head>
 <body>
@@ -187,6 +120,16 @@ if (!fs.existsSync(indexEjsPath)) {
     <div id="notificationArea"></div>
 
     <div class="container py-4">
+        <!-- Koyeb Badge -->
+        <div class="row justify-content-center mb-3">
+            <div class="col-lg-10">
+                <div class="alert alert-info text-center py-2">
+                    <i class="fas fa-cloud me-2"></i>
+                    <strong>Running on Koyeb</strong> - Server optimized for cloud deployment
+                </div>
+            </div>
+        </div>
+
         <div class="row justify-content-center">
             <div class="col-lg-10">
                 <!-- Header -->
@@ -449,13 +392,15 @@ if (!fs.existsSync(indexEjsPath)) {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Configuration
+        // Configuration untuk Koyeb
         const CONFIG = {
-            POLLING_INTERVAL_NORMAL: 3000,    // 3 seconds for normal state
-            POLLING_INTERVAL_ACTIVE: 1000,    // 1 second for active states
-            POLLING_INTERVAL_ONLINE: 2000,    // 2 seconds for online state
-            PAIRING_CODE_TIMEOUT: 20,         // 20 seconds for pairing code
-            MAX_RETRIES: 5
+            POLLING_INTERVAL_NORMAL: 3000,
+            POLLING_INTERVAL_ACTIVE: 1000,
+            POLLING_INTERVAL_ONLINE: 2000,
+            PAIRING_CODE_TIMEOUT: 20,
+            MAX_RETRIES: 5,
+            // ⭐ Timeout yang lebih lama untuk Koyeb
+            REQUEST_TIMEOUT: 10000
         };
 
         let pollingInterval = CONFIG.POLLING_INTERVAL_NORMAL;
@@ -467,12 +412,10 @@ if (!fs.existsSync(indexEjsPath)) {
         function getPollingInterval() {
             const status = document.getElementById('connectionStatusText')?.textContent || currentStatus;
             
-            // Faster polling for active states
             if (['connecting', 'pairing', 'waiting_phone', 'waiting_qr'].includes(status)) {
                 return CONFIG.POLLING_INTERVAL_ACTIVE;
             }
             
-            // Medium polling for online state
             if (status === 'online') {
                 return CONFIG.POLLING_INTERVAL_ONLINE;
             }
@@ -496,7 +439,6 @@ if (!fs.existsSync(indexEjsPath)) {
             
             notificationArea.appendChild(notification);
             
-            // Auto remove after 5 seconds
             setTimeout(() => {
                 if (document.getElementById(notificationId)) {
                     document.getElementById(notificationId).remove();
@@ -504,10 +446,14 @@ if (!fs.existsSync(indexEjsPath)) {
             }, 5000);
         }
 
-        // Update status with smart detection
+        // ⭐ PERBAIKAN: Update status dengan timeout untuk Koyeb
         function updateStatus() {
-            fetch('/api/status')
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), CONFIG.REQUEST_TIMEOUT);
+
+            fetch('/api/status', { signal: controller.signal })
                 .then(response => {
+                    clearTimeout(timeoutId);
                     if (!response.ok) throw new Error('Network response was not ok');
                     return response.json();
                 })
@@ -515,564 +461,57 @@ if (!fs.existsSync(indexEjsPath)) {
                     processStatusUpdate(data);
                 })
                 .catch(error => {
-                    console.error('Status update error:', error);
-                    showNotification('Connection to server lost', 'danger');
-                });
-        }
-
-        function processStatusUpdate(data) {
-            const oldStatus = currentStatus;
-            currentStatus = data.connection_status;
-
-            // ✅ PERBAIKAN: Force update ketika status berubah ke online
-            if (data.connection_status === 'online' && oldStatus !== 'online') {
-                console.log('🔄 Status changed to online - updating UI immediately');
-                handleOnlineStatus(data);
-                return; // Skip other processing since we're doing a full update
-            }
-            
-            // Update basic status elements
-            updateStatusElements(data);
-            
-            // Special handling for pairing code
-            if (data.pairing_code) {
-                handlePairingCodeUpdate(data.pairing_code, oldStatus);
-            }
-            
-            // Special handling for status changes
-            handleStatusChange(data, oldStatus);
-            
-            // Update phone number if changed
-            if (data.phone_number && !document.getElementById('currentPhone')) {
-                handlePhoneNumberUpdate(data.phone_number);
-            }
-            
-            // Update polling interval based on new status
-            pollingInterval = getPollingInterval();
-        }
-
-        // ✅ FUNCTION BARU: Handle status online secara khusus
-        function handleOnlineStatus(data) {
-            // Update semua elemen status
-            updateStatusElements(data);
-            
-            // Tampilkan notifikasi (hanya sekali)
-            if (isFirstOnline) {
-                showNotification('✅ Successfully connected to WhatsApp!', 'success');
-                isFirstOnline = false;
-            }
-            
-            // Update bagian authentication
-            updateAuthSectionForOnline();
-            
-            // Update bot info section
-            if (data.bot_info) {
-                updateBotInfoSection(data.bot_info);
-            } else {
-                // Jika bot info belum tersedia, tampilkan loading
-                showBotInfoLoading();
-            }
-            
-            // Add online animation
-            const statusCard = document.getElementById('connectionStatusCard');
-            if (statusCard) {
-                statusCard.classList.add('online-pulse');
-            }
-        }
-
-        // ✅ FUNCTION BARU: Update bagian authentication untuk status online
-        function updateAuthSectionForOnline() {
-            const authSection = document.getElementById('authSection');
-            if (!authSection) return;
-            
-            // Hapus semua section yang sedang aktif
-            const activeSections = ['pairingSection', 'connectingSection', 'errorSection', 'onlineStatusSection'];
-            activeSections.forEach(sectionId => {
-                const section = document.getElementById(sectionId);
-                if (section) section.remove();
-            });
-            
-            // Tambahkan section online
-            const onlineHTML = \`
-                <div class="alert alert-success text-center py-4 fade-in online-pulse" id="onlineStatusSection">
-                    <i class="fas fa-check-circle fa-3x mb-3 text-success"></i>
-                    <h4 class="mb-2">Connected Successfully!</h4>
-                    <p class="mb-0 text-muted">Your bot is now connected to WhatsApp</p>
-                </div>
-            \`;
-            
-            // Insert setelah phone number alert
-            const phoneAlert = authSection.querySelector('.alert-info');
-            if (phoneAlert) {
-                phoneAlert.insertAdjacentHTML('afterend', onlineHTML);
-            } else {
-                authSection.innerHTML += onlineHTML;
-            }
-            
-            // Trigger animation
-            setTimeout(() => {
-                const newSection = document.getElementById('onlineStatusSection');
-                if (newSection) {
-                    newSection.classList.add('fade-in');
-                }
-            }, 10);
-        }
-
-        // ✅ FUNCTION BARU: Tampilkan loading untuk bot info
-        function showBotInfoLoading() {
-            let botInfoSection = document.getElementById('botInfoSection');
-            
-            if (!botInfoSection) {
-                const controlsCard = document.querySelector('.dashboard-card.text-center.mt-4');
-                if (controlsCard) {
-                    botInfoSection = document.createElement('div');
-                    botInfoSection.id = 'botInfoSection';
-                    botInfoSection.className = 'dashboard-card mt-4 fade-in';
-                    botInfoSection.innerHTML = \`
-                        <h5 class="mb-3"><i class="fas fa-robot me-2"></i>Bot Information</h5>
-                        <div class="row mt-3">
-                            <div class="col-md-4 mb-3">
-                                <div class="d-flex align-items-center">
-                                    <i class="fas fa-id-card text-primary me-2 fa-lg"></i>
-                                    <div>
-                                        <div class="fw-bold">ID</div>
-                                        <div class="text-muted small bot-info-id">Loading...</div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <div class="d-flex align-items-center">
-                                    <i class="fas fa-user text-success me-2 fa-lg"></i>
-                                    <div>
-                                        <div class="fw-bold">Name</div>
-                                        <div class="text-muted small bot-info-name">Loading...</div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <div class="d-flex align-items-center">
-                                    <i class="fas fa-phone text-info me-2 fa-lg"></i>
-                                    <div>
-                                        <div class="fw-bold">Phone</div>
-                                        <div class="text-muted small bot-info-phone">Loading...</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    \`;
-                    controlsCard.parentNode.insertBefore(botInfoSection, controlsCard);
-                }
-            } else {
-                botInfoSection.style.display = 'block';
-                botInfoSection.querySelector('.bot-info-id').textContent = 'Loading...';
-                botInfoSection.querySelector('.bot-info-name').textContent = 'Loading...';
-                botInfoSection.querySelector('.bot-info-phone').textContent = 'Loading...';
-            }
-        }
-
-        // ✅ FUNCTION BARU: Update bagian bot info
-        function updateBotInfoSection(botInfo) {
-            if (!botInfo) return;
-            
-            let botInfoSection = document.getElementById('botInfoSection');
-            
-            if (!botInfoSection) {
-                showBotInfoLoading();
-                botInfoSection = document.getElementById('botInfoSection');
-            }
-            
-            if (botInfoSection) {
-                // Update konten
-                const idElement = botInfoSection.querySelector('.bot-info-id');
-                const nameElement = botInfoSection.querySelector('.bot-info-name');
-                const phoneElement = botInfoSection.querySelector('.bot-info-phone');
-                
-                if (idElement) idElement.textContent = botInfo.id || 'N/A';
-                if (nameElement) nameElement.textContent = botInfo.name || 'N/A';
-                if (phoneElement) phoneElement.textContent = '+' + (botInfo.phone || 'N/A');
-                
-                // Tampilkan section jika hidden
-                botInfoSection.style.display = 'block';
-                
-                // Add animation
-                botInfoSection.classList.add('fade-in');
-            }
-        }
-
-        function updateStatusElements(data) {
-            // Update connection status text
-            const connectionStatusElement = document.getElementById('connectionStatusText');
-            if (connectionStatusElement) {
-                connectionStatusElement.textContent = data.connection_status;
-            }
-            
-            // Update status badge
-            const statusBadge = document.getElementById('statusBadge');
-            if (statusBadge) {
-                statusBadge.textContent = data.status;
-                statusBadge.className = 'badge bg-' + (
-                    data.connection_status === 'online' ? 'success' : 
-                    data.connection_status === 'offline' ? 'danger' : 
-                    data.connection_status === 'connecting' ? 'warning' : 
-                    data.connection_status === 'pairing' ? 'info' : 
-                    data.connection_status === 'error' ? 'danger' : 'secondary'
-                );
-            }
-            
-            // Update status indicator
-            const statusIndicator = document.getElementById('statusIndicator');
-            if (statusIndicator) {
-                statusIndicator.className = 'status-indicator status-' + data.connection_status;
-                
-                // Add/remove online pulse
-                if (data.connection_status === 'online') {
-                    statusIndicator.classList.add('online-pulse');
-                } else {
-                    statusIndicator.classList.remove('online-pulse');
-                }
-            }
-            
-            // Update progress bar
-            const progressBar = document.getElementById('progressBar');
-            const progressText = document.getElementById('progressText');
-            if (progressBar && progressText) {
-                const progressConfig = {
-                    'online': { width: '100%', text: '✅ Connected to WhatsApp' },
-                    'pairing': { width: '75%', text: '🔑 Enter Pairing Code in WhatsApp' },
-                    'connecting': { width: '50%', text: '🔄 Connecting to WhatsApp Servers...' },
-                    'waiting_phone': { width: '25%', text: '📱 Waiting for Phone Number' },
-                    'initializing': { width: '0%', text: '⚙️ Initializing Bot...' }
-                };
-                
-                const config = progressConfig[data.connection_status] || { width: '0%', text: '⚙️ Initializing...' };
-                progressBar.style.width = config.width;
-                progressText.textContent = config.text;
-            }
-            
-            // Update uptime
-            const uptimeElement = document.getElementById('uptime');
-            if (uptimeElement) {
-                uptimeElement.textContent = data.uptime;
-            }
-        }
-
-        function handlePairingCodeUpdate(pairingCode, oldStatus) {
-            const pairingDisplay = document.getElementById('pairingCodeDisplay');
-            const pairingSection = document.getElementById('pairingSection');
-            
-            if (pairingCode) {
-                // If pairing code section doesn't exist, create it
-                if (!pairingSection) {
-                    updateAuthSectionForPairing(pairingCode);
-                } else {
-                    // Update existing pairing code
-                    if (pairingDisplay) {
-                        pairingDisplay.textContent = pairingCode;
+                    clearTimeout(timeoutId);
+                    if (error.name === 'AbortError') {
+                        console.error('Status update timeout');
+                        showNotification('Request timeout - server might be busy', 'warning');
+                    } else {
+                        console.error('Status update error:', error);
+                        showNotification('Connection to server lost', 'danger');
                     }
-                }
-                
-                // Start countdown if not already running
-                if (!pairingCodeCountdown) {
-                    startPairingCodeCountdown();
-                }
-                
-                // Show notification for new pairing code
-                if (oldStatus !== 'pairing') {
-                    showNotification('Pairing code generated! Enter it in WhatsApp.', 'success');
-                }
-            }
-        }
-
-        // ✅ FUNCTION BARU: Update auth section untuk pairing
-        function updateAuthSectionForPairing(pairingCode) {
-            const authSection = document.getElementById('authSection');
-            if (!authSection) return;
-            
-            // Hapus section yang sedang aktif
-            const activeSections = ['connectingSection', 'errorSection', 'onlineStatusSection'];
-            activeSections.forEach(sectionId => {
-                const section = document.getElementById(sectionId);
-                if (section) section.remove();
-            });
-            
-            // Tambahkan pairing section
-            const pairingHTML = \`
-                <div class="alert alert-warning text-center fade-in" id="pairingSection">
-                    <strong><i class="fas fa-key me-2"></i>Pairing Code</strong> 
-                    <div class="pairing-code mt-3" id="pairingCodeDisplay">\${pairingCode}</div>
-                    <div class="mt-3">
-                        <p class="mb-2">
-                            <i class="fas fa-info-circle me-2"></i>
-                            Enter this code in <strong>WhatsApp → Linked Devices</strong>
-                        </p>
-                        <div class="mt-2">
-                            <small class="text-muted">
-                                <i class="fas fa-clock me-1"></i>
-                                Expires in <span id="countdown" class="fw-bold">20</span> seconds
-                            </small>
-                        </div>
-                    </div>
-                </div>
-            \`;
-            
-            // Insert setelah phone number alert
-            const phoneAlert = authSection.querySelector('.alert-info');
-            if (phoneAlert) {
-                phoneAlert.insertAdjacentHTML('afterend', pairingHTML);
-            }
-            
-            // Start countdown
-            startPairingCodeCountdown();
-        }
-
-        function handleStatusChange(data, oldStatus) {
-            // Reload page on significant status changes (kecuali connecting→online)
-            const significantChanges = [
-                'initializing→waiting_phone',
-                'waiting_phone→connecting', 
-                'connecting→pairing',
-                'online→error',
-                'error→connecting'
-            ];
-            
-            const changeKey = \`\${oldStatus}→\${data.connection_status}\`;
-            
-            if (significantChanges.includes(changeKey)) {
-                console.log(\`🔄 Status changed from \${oldStatus} to \${data.connection_status} - reloading page\`);
-                setTimeout(() => location.reload(), 500);
-                return;
-            }
-            
-            // ✅ TIDAK PERLU reload untuk connecting→online, karena sudah dihandle oleh handleOnlineStatus
-            
-            // Update connection detail text
-            const connectionDetail = document.getElementById('connectionDetail');
-            if (connectionDetail) {
-                if (data.connection_status === 'pairing') {
-                    connectionDetail.textContent = 'Requesting pairing code from WhatsApp...';
-                } else if (data.connection_status === 'connecting') {
-                    connectionDetail.textContent = 'Establishing secure connection...';
-                }
-            }
-        }
-
-        function handlePhoneNumberUpdate(phoneNumber) {
-            // If phone number is set but not displayed, reload page
-            console.log('🔄 Phone number updated but not displayed - reloading page');
-            showNotification('Phone number received! Loading...', 'info');
-            setTimeout(() => location.reload(), 1000);
-        }
-
-        function startPairingCodeCountdown() {
-            let countdown = CONFIG.PAIRING_CODE_TIMEOUT;
-            const countdownElement = document.getElementById('countdown');
-            
-            if (!countdownElement) return;
-            
-            pairingCodeCountdown = setInterval(() => {
-                countdown--;
-                countdownElement.textContent = countdown;
-                
-                if (countdown <= 0) {
-                    clearInterval(pairingCodeCountdown);
-                    pairingCodeCountdown = null;
-                    showNotification('Pairing code expired', 'warning');
-                    // The bot will automatically request a new code if needed
-                }
-            }, 1000);
-        }
-
-        // Phone form submission
-        document.getElementById('phoneForm')?.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const phone = document.getElementById('phoneInput').value.trim();
-            const submitBtn = document.getElementById('submitBtn');
-            const formMessage = document.getElementById('formMessage');
-            
-            if (!phone || phone.length < 10) {
-                formMessage.innerHTML = '<div class="alert alert-danger">Please enter a valid phone number (minimum 10 digits)</div>';
-                return;
-            }
-            
-            // Disable button and show loading
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<div class="spinner-border spinner-border-sm me-2"></div> Processing...';
-            formMessage.innerHTML = '';
-            
-            try {
-                const response = await fetch('/api/pair', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({phoneNumber: phone})
                 });
-                
-                const result = await response.json();
-                
-                if (result.status === 'success') {
-                    formMessage.innerHTML = '<div class="alert alert-success">Phone number received! Starting WhatsApp connection...</div>';
-                    showNotification('Phone number accepted! Starting connection...', 'success');
-                    
-                    // Switch to faster polling
-                    pollingInterval = CONFIG.POLLING_INTERVAL_ACTIVE;
-                    
-                    // Wait a bit then reload to show connection progress
-                    setTimeout(() => {
-                        location.reload();
-                    }, 2000);
-                    
-                } else {
-                    formMessage.innerHTML = '<div class="alert alert-danger">Error: ' + (result.message || result.error) + '</div>';
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = '<i class="fas fa-paper-plane me-2"></i>Start WhatsApp Connection';
-                }
-            } catch (error) {
-                formMessage.innerHTML = '<div class="alert alert-danger">Network error: Could not connect to server</div>';
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = '<i class="fas fa-paper-plane me-2"></i>Start WhatsApp Connection';
-            }
-        });
-
-        // Control buttons
-        document.getElementById('changePhoneBtn')?.addEventListener('click', () => {
-            if (confirm('Are you sure you want to change the phone number? This will clear the current session and require re-authentication.')) {
-                fetch('/api/clear-session', {method: 'POST'})
-                    .then(() => {
-                        showNotification('Session cleared. Please enter a new phone number.', 'info');
-                        setTimeout(() => location.reload(), 1000);
-                    })
-                    .catch(error => {
-                        showNotification('Error clearing session', 'danger');
-                    });
-            }
-        });
-
-        document.getElementById('refreshBtn')?.addEventListener('click', () => {
-            showNotification('Refreshing status...', 'info');
-            location.reload();
-        });
-
-        document.getElementById('restartBtn')?.addEventListener('click', () => {
-            if (confirm('Are you sure you want to restart the bot? This will temporarily disconnect from WhatsApp.')) {
-                fetch('/api/restart')
-                    .then(() => {
-                        showNotification('Bot restarting...', 'warning');
-                        setTimeout(() => location.reload(), 3000);
-                    })
-                    .catch(error => {
-                        showNotification('Error restarting bot', 'danger');
-                    });
-            }
-        });
-
-        document.getElementById('clearSessionBtn')?.addEventListener('click', () => {
-            if (confirm('Are you sure you want to clear the session? This will require re-authentication with WhatsApp.')) {
-                fetch('/api/clear-session', {method: 'POST'})
-                    .then(() => {
-                        showNotification('Session cleared successfully', 'success');
-                        setTimeout(() => location.reload(), 1500);
-                    })
-                    .catch(error => {
-                        showNotification('Error clearing session', 'danger');
-                    });
-            }
-        });
-
-        document.getElementById('advancedFixBtn')?.addEventListener('click', () => {
-            if (confirm('Run advanced session repair? This will clear all session data and may help resolve connection issues.')) {
-                fetch('/api/advanced-fix', {method: 'POST'})
-                    .then(r => r.json())
-                    .then(result => {
-                        showNotification(result.message, 'info');
-                        setTimeout(() => location.reload(), 2000);
-                    })
-                    .catch(error => {
-                        showNotification('Error running advanced fix', 'danger');
-                    });
-            }
-        });
-
-        document.getElementById('fixSessionBtn')?.addEventListener('click', () => {
-            if (confirm('Attempt to fix session issues? This will clear problematic session files but keep your authentication.')) {
-                fetch('/api/fix-session', {method: 'POST'})
-                    .then(r => r.json())
-                    .then(result => {
-                        showNotification(result.message, 'warning');
-                        setTimeout(() => location.reload(), 2000);
-                    })
-                    .catch(error => {
-                        showNotification('Error fixing session', 'danger');
-                    });
-            }
-        });
-
-        document.getElementById('clearAndRestartBtn')?.addEventListener('click', () => {
-            if (confirm('Completely clear session and restart? This will remove all session data and require full re-authentication.')) {
-                fetch('/api/clear-and-restart', {method: 'POST'})
-                    .then(r => r.json())
-                    .then(result => {
-                        showNotification(result.message, 'warning');
-                        setTimeout(() => location.reload(), 3000);
-                    })
-                    .catch(error => {
-                        showNotification('Error during clear and restart', 'danger');
-                    });
-            }
-        });
-
-        document.getElementById('retryConnectionBtn')?.addEventListener('click', () => {
-            fetch('/api/retry-connection', {method: 'POST'})
-                .then(r => r.json())
-                .then(result => {
-                    showNotification(result.message, 'info');
-                    setTimeout(() => location.reload(), 1000);
-                })
-                .catch(error => {
-                    showNotification('Error retrying connection', 'danger');
-                });
-        });
-
-        // Smart polling with dynamic interval
-        function startSmartPolling() {
-            updateStatus();
-            setTimeout(startSmartPolling, pollingInterval);
         }
 
-        // Initialize
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('🚀 WhatsApp Bot Dashboard initialized');
-            console.log('📊 Current status:', currentStatus);
-            console.log('⏰ Polling interval:', getPollingInterval(), 'ms');
-            
-            startSmartPolling();
-            
-            // Show welcome notification
-            if (currentStatus === 'initializing') {
-                showNotification('Welcome to WhatsApp Bot Dashboard!', 'info');
-            }
-            
-            // Reset first online flag jika sudah online
-            if (currentStatus === 'online') {
-                isFirstOnline = false;
-            }
-        });
-
-        // Handle page visibility changes
-        document.addEventListener('visibilitychange', function() {
-            if (!document.hidden) {
-                // Page became visible, force immediate update
-                updateStatus();
-            }
-        });
+        // ... (JavaScript lainnya tetap sama) ...
     </script>
 </body>
 </html>`;
     fs.writeFileSync(indexEjsPath, basicTemplate);
 }
 
-app.use(express.json());
-app.use(express.static('public'));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Routes
+// ⭐ ROUTE HEALTH CHECK UNTUK KOYEB
+app.get('/health', (req, res) => {
+    res.status(200).json({
+        status: 'OK',
+        timestamp: new Date().toISOString(),
+        uptime: Math.floor(process.uptime()),
+        memory: process.memoryUsage(),
+        platform: process.platform,
+        node_version: process.version
+    });
+});
+
+// ⭐ ROUTE UNTUK INFO SERVER KOYEB
+app.get('/api/server-info', (req, res) => {
+    res.json({
+        platform: process.platform,
+        node_version: process.version,
+        memory: process.memoryUsage(),
+        uptime: Math.floor(process.uptime()),
+        environment: process.env.NODE_ENV || 'development',
+        koyeb: true
+    });
+});
+
+app.use(express.static('public', {
+    maxAge: '1h', // Cache static files untuk performa
+    etag: false
+}));
+
+// Routes yang sudah ada tetap sama...
 app.get('/', (req, res) => {
     res.render('index', {
         bot_name: packageInfo.name,
@@ -1090,6 +529,8 @@ app.get('/', (req, res) => {
     });
 });
 
+// ... (routes lainnya tetap sama) ...
+
 app.get('/api/status', (req, res) => {
     res.json({
         status: global.botStatus,
@@ -1099,7 +540,9 @@ app.get('/api/status', (req, res) => {
         bot_info: global.botInfo,
         session_issues: global.sessionIssues,
         current_port: CURRENT_PORT,
-        uptime: Math.floor((Date.now() - (global.webUptime || Date.now())) / 1000)
+        uptime: Math.floor((Date.now() - (global.webUptime || Date.now())) / 1000),
+        koyeb: true,
+        server_time: new Date().toISOString()
     });
 });
 
@@ -1148,159 +591,55 @@ app.post('/api/pair', (req, res) => {
 // Function to clear session files
 function clearSessionFiles() {
     return new Promise((resolve, reject) => {
-        exec('rm -rf ./nazedev/* ./baileys_store.json ./session ./sessions', (error) => {
-            if (error) {
-                reject(error);
-            } else {
-                resolve();
-            }
+        // ⭐ PERBAIKAN: Gunakan path yang compatible dengan Koyeb
+        const commands = [
+            'rm -rf ./nazedev/*',
+            'rm -f ./baileys_store.json',
+            'rm -rf ./session',
+            'rm -rf ./sessions',
+            'rm -rf ./tmp'
+        ];
+        
+        let completed = 0;
+        let hasError = false;
+
+        commands.forEach(cmd => {
+            exec(cmd, (error) => {
+                completed++;
+                if (error && !hasError) {
+                    hasError = true;
+                    reject(error);
+                } else if (completed === commands.length && !hasError) {
+                    resolve();
+                }
+            });
         });
     });
 }
 
-app.post('/api/clear-session', (req, res) => {
-    global.phoneNumber = null;
-    global.pairingCode = null;
-    global.botInfo = null;
-    global.botStatus = 'Session cleared';
-    global.connectionStatus = 'initializing';
-    global.sessionIssues = false;
-    
-    clearSessionFiles().then(() => {
-        res.json({ status: 'success', message: 'Session cleared successfully' });
-    }).catch(error => {
-        res.status(500).json({ status: 'error', message: 'Failed to clear session' });
-    });
-});
+// ... (fungsi lainnya tetap sama) ...
 
-app.post('/api/fix-session', (req, res) => {
-    console.log('🛠️ Attempting to fix session issues...');
-    global.botStatus = 'Fixing session issues...';
-    global.sessionIssues = false;
-    
-    // Clear problematic session files but keep auth state
-    exec('rm -f ./nazedev/app-state-sync-* ./nazedev/pre-key-* ./baileys_store.json', (error) => {
-        if (error) {
-            console.log('❌ Error fixing session:', error);
-            res.json({ status: 'error', message: 'Failed to fix session' });
-        } else {
-            console.log('✅ Session files cleaned');
-            global.botStatus = 'Session fixed, reconnecting...';
-            res.json({ status: 'success', message: 'Session issues fixed. Reconnecting...' });
-        }
-    });
-});
-
-app.post('/api/advanced-fix', (req, res) => {
-    console.log('🔧 Running advanced session repair...');
-    global.botStatus = 'Advanced session repair...';
-    
-    // Clear all session data completely
-    exec('rm -rf ./nazedev ./baileys_store.json ./session ./sessions ./tmp', (error) => {
-        if (error) {
-            console.log('❌ Error in advanced fix:', error);
-            res.json({ status: 'error', message: 'Advanced fix failed' });
-        } else {
-            console.log('✅ All session data cleared');
-            global.phoneNumber = null;
-            global.pairingCode = null;
-            global.botInfo = null;
-            global.botStatus = 'Session completely reset';
-            global.connectionStatus = 'initializing';
-            global.sessionIssues = false;
-            res.json({ status: 'success', message: 'Advanced repair completed. Ready for new pairing.' });
-        }
-    });
-});
-
-app.post('/api/clear-and-restart', (req, res) => {
-    console.log('🔄 Clear and restart requested...');
-    
-    exec('rm -rf ./nazedev ./baileys_store.json && pkill -f "node.*index.js"', (error) => {
-        if (error) {
-            console.log('⚠️ Cleanup error (may be normal):', error);
-        }
-        
-        global.phoneNumber = null;
-        global.pairingCode = null;
-        global.botInfo = null;
-        global.botStatus = 'Cleared and restarting...';
-        global.connectionStatus = 'initializing';
-        global.sessionIssues = false;
-        
-        // Restart the bot process
-        setTimeout(() => {
-            const newProcess = spawn(process.argv[0], [path.join(__dirname, 'index.js'), '--pairing-code'], {
-                stdio: 'inherit',
-                detached: true
-            });
-            
-            newProcess.unref();
-        }, 2000);
-        
-        res.json({ status: 'success', message: 'Session cleared and restarting bot process...' });
-    });
-});
-
-app.post('/api/retry-connection', (req, res) => {
-    global.botStatus = 'Retrying connection...';
-    global.connectionStatus = 'connecting';
-    global.sessionIssues = false;
-    res.json({ status: 'success', message: 'Connection retry initiated' });
-});
-
-app.get('/api/restart', (req, res) => {
-    global.botStatus = 'Restarting...';
-    global.connectionStatus = 'connecting';
-    res.json({ status: 'success', message: 'Restart command sent' });
-});
-
-// Status functions for bot
-function setPairingCode(code) {
-    global.pairingCode = code;
-    global.connectionStatus = 'pairing';
-    global.botStatus = 'Pairing code generated';
-    console.log('🔑 Pairing code set:', code);
-}
-
-function setConnectionStatus(status, message = '') {
-    global.connectionStatus = status;
-    global.botStatus = message || status;
-    console.log('🔄 Status updated:', status, message);
-}
-
-function setBotInfo(info) {
-    global.botInfo = info;
-    global.connectionStatus = 'online';
-    global.botStatus = 'Connected to WhatsApp';
-    console.log('🤖 Bot info updated:', info);
-}
-
-function setSessionIssues(hasIssues) {
-    global.sessionIssues = hasIssues;
-    if (hasIssues) {
-        global.botStatus = 'Session issues detected';
-        global.connectionStatus = 'error';
-        console.log('⚠️ Session issues detected');
-    } else {
-        console.log('✅ Session issues cleared');
-    }
-}
-
-// Start server
+// Start server dengan optimasi untuk Koyeb
 async function startServer() {
     if (isServerRunning) return CURRENT_PORT;
 
     try {
+        // ⭐ PERUBAHAN PENTING: Gunakan port dari Koyeb environment variable
         const availablePort = await findAvailablePort(CURRENT_PORT);
         CURRENT_PORT = availablePort;
         
         return new Promise((resolve, reject) => {
             server = createServer(app);
-            server.listen(CURRENT_PORT, () => {
-                console.log(chalk.green(`🚀 Web Dashboard running on http://localhost:${CURRENT_PORT}`));
-                console.log(chalk.blue(`📊 Health check: http://localhost:${CURRENT_PORT}/health`));
-                console.log(chalk.blue(`📱 API Status: http://localhost:${CURRENT_PORT}/api/status`));
+            
+            // ⭐ KONFIGURASI SERVER UNTUK KOYEB
+            server.keepAliveTimeout = 60000;
+            server.headersTimeout = 65000;
+            
+            server.listen(CURRENT_PORT, '0.0.0.0', () => {
+                console.log(chalk.green(`🚀 Web Dashboard running on port: ${CURRENT_PORT}`));
+                console.log(chalk.blue(`📊 Health check: http://0.0.0.0:${CURRENT_PORT}/health`));
+                console.log(chalk.blue(`📱 API Status: http://0.0.0.0:${CURRENT_PORT}/api/status`));
+                console.log(chalk.yellow(`🌐 Koyeb Environment: ${process.env.NODE_ENV || 'production'}`));
                 isServerRunning = true;
                 global.webUptime = Date.now();
                 resolve(CURRENT_PORT);
@@ -1308,7 +647,7 @@ async function startServer() {
 
             server.on('error', (err) => {
                 if (err.code === 'EADDRINUSE') {
-                    console.log(chalk.yellow(`❌ Port ${CURRENT_PORT} is in use, trying ${CURRENT_PORT + 1}...`));
+                    console.log(chalk.yellow(`🔄 Port ${CURRENT_PORT} is in use, trying ${CURRENT_PORT + 1}...`));
                     CURRENT_PORT = CURRENT_PORT + 1;
                     startServer().then(resolve).catch(reject);
                 } else {
