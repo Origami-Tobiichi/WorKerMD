@@ -59,7 +59,14 @@ module.exports = naze = async (naze, m, msg, store) => {
 	
 	try {
 		
-		await LoadDataBase(naze, m);
+		//await LoadDataBase(naze, m);
+		if (m && m.sender) {
+    await LoadDataBase(naze, m);
+} else {
+    console.log('Pesan tidak valid: m atau m.sender undefined');
+    // Opsional: Beri respons error ke pengguna
+    // await naze.sendMessage(m.key.remoteJid, { text: 'Pesan tidak valid' }, { quoted: m });
+		}
 		await GroupUpdate(naze, m, store);
 		
 		const body = ((m.type === 'conversation') ? m.message.conversation :
@@ -4588,3 +4595,4 @@ fs.watchFile(file, () => {
 	delete require.cache[file]
 	require(file)
 });
+
