@@ -64,10 +64,10 @@ const pairingCode = process.argv.includes('--qr') ? false : process.argv.include
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 const question = (text) => new Promise((resolve) => rl.question(text, resolve));
 
-// Konfigurasi pairing
+// ⭐ PERBAIKAN: Konfigurasi yang lebih optimal
 const DELAY_BEFORE_PAIRING = 2000;
 const DELAY_AFTER_PAIRING_CODE = 500;
-const PAIRING_CODE_TIMEOUT = 30;
+const PAIRING_CODE_TIMEOUT = 60; // ⭐ DITINGKATKAN: 60 detik untuk memberi lebih banyak waktu
 
 let pairingStarted = false;
 let pairingCodeGenerated = false;
@@ -167,7 +167,7 @@ print('Baileys', `v${require('./package.json').dependencies['@whiskeysockets/bai
 print('Date & Time', new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta', hour12: false }));
 console.log(chalk.green.bold('╚' + ('═'.repeat(30))));
 
-// ⭐ PERBAIKAN: Validasi nomor yang lebih sederhana
+// ⭐ PERBAIKAN: Validasi nomor yang lebih sederhana dan robust
 function isValidWhatsAppNumber(phoneNumber) {
     if (!phoneNumber || typeof phoneNumber !== 'string') return false;
     
@@ -183,7 +183,6 @@ function isValidWhatsAppNumber(phoneNumber) {
     return true;
 }
 
-// ⭐ PERBAIKAN: Format nomor yang lebih sederhana
 function formatPhoneNumber(phoneNumber) {
     if (!phoneNumber) return null;
     
@@ -192,11 +191,6 @@ function formatPhoneNumber(phoneNumber) {
     // Jika diawali 0, ubah ke 62
     if (cleanNumber.startsWith('0')) {
         return '62' + cleanNumber.substring(1);
-    }
-    
-    // Jika kurang dari 8 digit, anggap sebagai nomor lokal
-    if (cleanNumber.length >= 8 && cleanNumber.length <= 11 && !cleanNumber.startsWith('62')) {
-        return '62' + cleanNumber;
     }
     
     return cleanNumber;
@@ -294,7 +288,7 @@ async function quickRestart() {
 
 global.quickRestart = quickRestart;
 
-// ⭐ PERBAIKAN BESAR: Start NazeBot dengan pairing code yang diperbaiki
+// ⭐ PERBAIKAN BESAR: Start NazeBot dengan error handling yang lebih baik
 async function startNazeBot() {
     console.log(chalk.blue('🤖 Starting WhatsApp Bot...'));
     
@@ -306,12 +300,16 @@ async function startNazeBot() {
         const loadData = await database.read();
         const storeLoadData = await storeDB.read();
         
-        global.db = loadData || {
+        // ⭐ PERBAIKAN: Inisialisasi database yang lebih robust
+        global.db = {
             hit: {}, set: {}, cmd: {}, store: {}, users: {}, game: {}, groups: {}, 
-            database: {}, premium: [], sewa: []
+            database: {}, premium: [], sewa: [],
+            ...loadData
         };
-        global.store = storeLoadData || {
-            contacts: {}, presences: {}, messages: {}, groupMetadata: {}
+        
+        global.store = {
+            contacts: {}, presences: {}, messages: {}, groupMetadata: {},
+            ...storeLoadData
         };
         
         await database.write(global.db);
@@ -323,7 +321,14 @@ async function startNazeBot() {
         }, 30 * 1000);
     } catch (e) {
         console.log('Database error:', e);
-        process.exit(1);
+        // Jangan exit, biarkan tetap berjalan dengan database default
+        global.db = {
+            hit: {}, set: {}, cmd: {}, store: {}, users: {}, game: {}, groups: {}, 
+            database: {}, premium: [], sewa: []
+        };
+        global.store = {
+            contacts: {}, presences: {}, messages: {}, groupMetadata: {}
+        };
     }
     
     const getMessage = async (key) => {
@@ -354,22 +359,24 @@ async function startNazeBot() {
         markOnlineOnConnect: true,
         generateHighQualityLinkPreview: true,
         getMessage,
-        // Optimasi koneksi
-        retryRequestDelayMs: 1000,
-        maxRetries: 3,
-        connectTimeoutMs: 30000,
-        keepAliveIntervalMs: 10000,
+        // Optimasi koneksi untuk stability
+        retryRequestDelayMs: 2000,
+        maxRetries: 5,
+        connectTimeoutMs: 45000,
+        keepAliveIntervalMs: 20000,
         emitOwnEvents: true,
         defaultQueryTimeoutMs: 60000,
-        // Tambahan untuk kompatibilitas
         syncFullHistory: false,
         fireInitQueries: true,
-        authTimeoutMs: 20000
+        authTimeoutMs: 30000,
+        // Tambahan untuk handle connection issues
+        logger: pino({ level: 'silent' }),
+        browser: ['Ubuntu', 'Chrome', '20.0.04']
     });
     
     store.bind(naze.ev);
     
-    // ⭐ PERBAIKAN KRITIS: Proses pairing code yang diperbaiki
+    // ⭐ PERBAIKAN KRITIS: Proses pairing code yang lebih robust
     if (pairingCode && !naze.authState.creds.registered && !pairingCodeGenerated) {
         console.log(chalk.blue('🔧 Pairing mode activated'));
         
@@ -395,7 +402,7 @@ async function startNazeBot() {
             console.log(chalk.blue('🔍 Getting phone number...'));
             
             try {
-                phoneNumberToUse = await waitForPhoneFromWebDashboard(30000);
+                phoneNumberToUse = await waitForPhoneFromWebDashboard(45000); // 45 detik timeout
             } catch (error) {
                 console.log(chalk.yellow('🔄 Fallback to console input...'));
                 phoneNumberToUse = await getPhoneFromConsole();
@@ -418,21 +425,24 @@ async function startNazeBot() {
             console.log(chalk.blue(`⏳ Starting pairing process for: ${phoneNumberToUse}`));
             await sleep(DELAY_BEFORE_PAIRING);
             
-            // ⭐ PERBAIKAN PENTING: Request pairing code dengan error handling
             try {
                 pairingStarted = true;
                 setConnectionStatus('connecting', 'Requesting pairing code...');
                 
                 console.log(chalk.blue('🔄 Requesting pairing code from WhatsApp...'));
                 
-                // ⭐ PERBAIKAN: Gunakan try-catch khusus untuk request pairing code
+                // ⭐ PERBAIKAN: Request pairing code dengan timeout
                 let code;
                 try {
-                    code = await naze.requestPairingCode(phoneNumberToUse);
+                    code = await Promise.race([
+                        naze.requestPairingCode(phoneNumberToUse),
+                        new Promise((_, reject) => 
+                            setTimeout(() => reject(new Error('Pairing code request timeout')), 30000)
+                        )
+                    ]);
                 } catch (pairingError) {
                     console.log(chalk.red('❌ Failed to get pairing code:'), pairingError.message);
                     
-                    // Handle specific errors
                     if (pairingError.message.includes('rate') || pairingError.message.includes('too many')) {
                         console.log(chalk.yellow('⚠️ WhatsApp rate limit detected'));
                         setConnectionStatus('ratelimited', 'WhatsApp rate limit - Wait 2 minutes');
@@ -443,14 +453,12 @@ async function startNazeBot() {
                         global.phoneNumber = null;
                         setTimeout(() => startNazeBot(), 5000);
                     } else {
-                        // Unknown error, retry
                         setConnectionStatus('error', 'Failed to get pairing code');
                         setTimeout(() => startNazeBot(), 10000);
                     }
                     return;
                 }
                 
-                // ⭐ PERBAIKAN: Pastikan code berhasil didapatkan
                 if (!code) {
                     console.log(chalk.red('❌ Pairing code is empty or undefined'));
                     setConnectionStatus('error', 'No pairing code received');
@@ -460,7 +468,7 @@ async function startNazeBot() {
                 
                 console.log(chalk.green('✅ Pairing code received:'), chalk.bold(code));
                 console.log(chalk.yellow(`⏰ Code expires in ${PAIRING_CODE_TIMEOUT} seconds`));
-                console.log(chalk.blue('💡 Go to WhatsApp → Linked Devices → Link a Device'));
+                console.log(chalk.blue('💡 IMPORTANT: Go to WhatsApp → Linked Devices → Link a Device → Enter this code NOW!'));
                 
                 await sleep(DELAY_AFTER_PAIRING_CODE);
                 
@@ -468,19 +476,22 @@ async function startNazeBot() {
                 setPairingCode(code);
                 console.log(chalk.blue('📊 Pairing code sent to web dashboard'));
                 
-                // Set timeout untuk pairing code
+                // Set timeout untuk pairing code (60 detik)
                 currentPairingTimeout = setTimeout(() => {
                     if (global.connectionStatus !== 'online') {
-                        console.log(chalk.yellow('🔄 Pairing code expired'));
+                        console.log(chalk.yellow('🔄 Pairing code expired - user did not enter code in time'));
                         global.pairingCode = null;
                         pairingCodeGenerated = false;
                         pairingStarted = false;
                         currentPairingTimeout = null;
                         setConnectionStatus('waiting_phone', 'Pairing code expired');
                         
+                        // ⭐ PERBAIKAN: Beri pesan yang jelas
+                        console.log(chalk.yellow('💡 Please enter the pairing code faster next time. You have 60 seconds.'));
+                        
                         setTimeout(() => {
                             startNazeBot();
-                        }, 5000);
+                        }, 3000);
                     }
                 }, PAIRING_CODE_TIMEOUT * 1000);
                 
@@ -512,16 +523,22 @@ async function startNazeBot() {
         }
     }
     
-    // Handle Solving function
+    // ⭐ PERBAIKAN PENTING: Handle Solving function dengan error handling yang lebih baik
     try {
-        await Solving(naze, store);
+        if (typeof Solving === 'function') {
+            await Solving(naze, store);
+        } else {
+            console.log(chalk.yellow('⚠️ Solving function not available, skipping...'));
+        }
     } catch (error) {
-        console.log(chalk.red('❌ Error in Solving function:'), error);
+        console.log(chalk.red('❌ Error in Solving function:'), error.message);
+        console.log(chalk.yellow('⚠️ Continuing without Solving function...'));
+        // Jangan biarkan error di Solving function menghentikan bot
     }
     
     naze.ev.on('creds.update', saveCreds);
     
-    // ⭐ PERBAIKAN: Connection update handler yang diperbaiki
+    // ⭐ PERBAIKAN: Connection update handler yang lebih robust
     naze.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
         
@@ -539,6 +556,7 @@ async function startNazeBot() {
             
             setConnectionStatus('offline', 'Connection closed');
             
+            // ⭐ PERBAIKAN: Handle berbagai reason code dengan lebih baik
             if (reason === DisconnectReason.loggedOut || reason === DisconnectReason.forbidden) {
                 console.log('🗑️ Session invalid, clearing...');
                 setSessionIssues(true);
@@ -559,7 +577,13 @@ async function startNazeBot() {
                 
                 setTimeout(() => {
                     startNazeBot();
-                }, 3000);
+                }, 5000);
+            } else if (reason === 440) {
+                // ⭐ PERBAIKAN: Handle error 440 khusus
+                console.log('🔄 Connection error 440 - reconnecting with delay...');
+                setTimeout(() => {
+                    startNazeBot();
+                }, 8000);
             } else {
                 console.log('🔄 Reconnecting...');
                 setTimeout(() => {
@@ -593,7 +617,6 @@ async function startNazeBot() {
             console.log(chalk.blue('🤖 Bot info:'), botInfo);
         }
         
-        // ⭐ PERBAIKAN: Handle QR code hanya jika tidak menggunakan pairing code
         if (qr && !pairingCode) {
             console.log(chalk.yellow('📱 QR Code generated'));
             qrcode.generate(qr, { small: true });
@@ -602,22 +625,24 @@ async function startNazeBot() {
         }
     });
     
-    // Handle other events
+    // ⭐ PERBAIKAN: Handle other events dengan error handling
     naze.ev.on('messages.upsert', async (message) => {
         try {
-            await MessagesUpsert(naze, message, store);
+            if (typeof MessagesUpsert === 'function') {
+                await MessagesUpsert(naze, message, store);
+            }
         } catch (error) {
-            console.log(chalk.red('❌ Error in messages.upsert:'), error);
-            handleSessionError(error, 'messages.upsert');
+            console.log(chalk.red('❌ Error in messages.upsert:'), error.message);
         }
     });
     
     naze.ev.on('group-participants.update', async (update) => {
         try {
-            await GroupParticipantsUpdate(naze, update, store);
+            if (typeof GroupParticipantsUpdate === 'function') {
+                await GroupParticipantsUpdate(naze, update, store);
+            }
         } catch (error) {
-            console.log(chalk.red('❌ Error in group-participants.update:'), error);
-            handleSessionError(error, 'group-participants.update');
+            console.log(chalk.red('❌ Error in group-participants.update:'), error.message);
         }
     });
     
@@ -627,7 +652,7 @@ async function startNazeBot() {
             try {
                 await naze.sendPresenceUpdate('available').catch(() => {});
             } catch (error) {
-                handleSessionError(error, 'presence update');
+                console.log(chalk.yellow('⚠️ Error in presence update:'), error.message);
             }
         }
     }, 60000);
