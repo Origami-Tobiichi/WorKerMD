@@ -1,40 +1,34 @@
-FROM node:18-alpine
+FROM node:20-bullseye
 
-# Install dependencies yang diperlukan TERMASUK GIT
-RUN apk add --no-cache \
-    bash \
-    curl \
-    ffmpeg \
-    python3 \
-    make \
-    g++ \
-    git \
-    && rm -rf /var/cache/apk/*
-
-# Buat directory aplikasi
 WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && \
+    apt-get install -y \
+    ffmpeg \
+    imagemagick \
+    webp \
+    curl \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies dengan legacy-peer-deps
-RUN npm install --production --no-optional --legacy-peer-deps
+# Install npm dependencies
+RUN npm install --legacy-peer-deps --omit=dev --no-audit --no-fund
 
-# Copy source code
+# Copy ALL source code
 COPY . .
 
-# Buat directory untuk session
-RUN mkdir -p nazedev session sessions tmp
+# Create necessary directories
+RUN mkdir -p views
 
-# Set permissions
-RUN chmod -R 755 .
-
-# Expose port
 EXPOSE 3000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:3000/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:3000/ || exit 1
 
-# Start aplikasi
+# Start application
 CMD ["npm", "start"]
