@@ -1,0 +1,28 @@
+name: whatsapp-bot
+env:
+  - name: NODE_ENV
+    value: production
+  - name: KOYEB
+    value: "true"
+  - name: PORT
+    value: "3000"
+docker:
+  image: node:20-bullseye
+build:
+  command: |
+    apt-get update && apt-get install -y ffmpeg imagemagick webp curl git
+    npm install --legacy-peer-deps --omit=dev --no-audit --no-fund
+    mkdir -p views nazedev session sessions tmp
+    chmod -R 755 nazedev session sessions tmp
+resources:
+  memory: 1024
+  cpu: 1000
+ports:
+  - port: 3000
+    protocol: http
+routes:
+  - path: /
+    port: 3000
+scaling:
+  min: 1
+  max: 1
