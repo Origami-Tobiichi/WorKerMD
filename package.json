@@ -1,15 +1,14 @@
 {
   "name": "hitori",
   "version": "1.0.8",
-  "description": "Bot WhatsApp Using Lib Baileys Multi Device - Optimized for Koyeb",
-  "main": "index.js",
+  "description": "Bot WhatsApp Using Lib Baileys Multi Device",
+  "main": "start.js --pairing-code",
   "type": "commonjs",
   "scripts": {
-    "start": "node index.js --pairing-code --koyeb",
+    "start": "node start.js --pairing-code",
     "dev": "nodemon index.js --pairing-code",
-    "debug": "DEBUG=* node index.js --pairing-code",
-    "web": "node index.js --pairing-code",
-    "koyeb": "node index.js --pairing-code --koyeb"
+    "debug": "DEBUG=* node start.js --pairing-code",
+    "web": "node index.js --pairing-code"
   },
   "keywords": [
     "whatsapp-bot",
@@ -81,4 +80,4 @@
     "url": "https://github.com/nazedev/hitori/issues"
   },
   "homepage": "https://github.com/nazedev/hitori#readme"
-} 
+}
