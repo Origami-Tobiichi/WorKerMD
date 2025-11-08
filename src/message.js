@@ -131,7 +131,8 @@ async function LoadDataBase(naze, m) {
 		const botNumber = await naze.decodeJid(naze.user.id);
 		let game = global.db.game || {};
 		let premium = global.db.premium || [];
-		let user = global.db.users[m.sender] || {};
+		//let user = global.db.users[m.sender] || {};
+		let user = (m && m.sender && global.db.users[m.sender]) ? global.db.users[m.sender] : {};
 		let setBot = global.db.set[botNumber] || {};
 		
 		global.db.game = game;
@@ -1004,3 +1005,4 @@ fs.watchFile(file, () => {
 	delete require.cache[file]
 	require(file)
 });
+
