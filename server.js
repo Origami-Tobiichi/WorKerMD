@@ -59,7 +59,7 @@ if (!global.webSettings) {
         allowPremiumManagement: true,
         allowBotSettings: true,
         allowMultiBot: true,
-        adminPassword: 'admin123'
+        adminPassword: 'takamiya@botwa#77'
     };
 }
 
@@ -2597,4 +2597,5 @@ module.exports = {
 
 if (require.main === module) {
     startServer().catch(console.error);
+
 }
