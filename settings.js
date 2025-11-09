@@ -38,7 +38,7 @@ global.webSettings = {
     adminPassword: 'admin123' // Password untuk akses management panel
 }
 
-global.listv = ['вҖў','в—Ҹ','в– ','вңҝ','в–І','вһ©','вһў','вһЈ','вһӨ','вңҰ','вң§','в–і','вқҖ','в—Ӣ','в–Ў','вҷӨ','вҷЎ','в—Ү','вҷ§','гҖ…','гҖҶ']
+global.listv = ['☄','✧','➳','✄','♞','♘','☞','‣','⌲','⌦','⎆','►','⛀','⛁','⛂','⛃','✈','➣','➢','➥','➬']
 global.tempatDB = 'database.json' // Taruh url mongodb di sini jika menggunakan mongodb. Format : 'mongodb+srv://...'
 global.tempatStore = 'baileys_store.json' // Taruh url mongodb di sini jika menggunakan mongodb. Format : 'mongodb+srv://...'
 global.pairing_code = true
@@ -108,3 +108,4 @@ fs.watchFile(file, () => {
 	require(file)
 
 });
+
