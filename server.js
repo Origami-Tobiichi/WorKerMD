@@ -21,7 +21,7 @@ let CURRENT_PORT = process.env.PORT || 3000;
 let isServerRunning = false;
 
 // ==============================
-// 🌐 HTML DASHBOARD - SIMPLE & WORKING
+// 🌐 HTML DASHBOARD - OPTIMIZED FOR KOYEB
 // ==============================
 
 const HTML_DASHBOARD = `
@@ -70,6 +70,10 @@ const HTML_DASHBOARD = `
             background: linear-gradient(135deg, #667eea, #764ba2);
             border: none;
         }
+        .security-badge {
+            background: linear-gradient(135deg, #fd7e14, #e44d26);
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -80,6 +84,9 @@ const HTML_DASHBOARD = `
                 <i class="fab fa-whatsapp me-2"></i>WhatsApp Bot Dashboard
             </h1>
             <p class="lead text-muted">Secure Connection • Real-time Monitoring</p>
+            <span class="badge security-badge fs-6">
+                <i class="fas fa-shield-alt me-1"></i>Secure Mode Active
+            </span>
         </div>
 
         <!-- Connection Status -->
@@ -107,18 +114,76 @@ const HTML_DASHBOARD = `
 
             <div class="col-md-6">
                 <div class="dashboard-card h-100">
-                    <h4><i class="fas fa-mobile-alt me-2"></i>WhatsApp Connection</h4>
-                    <form id="phoneForm">
-                        <div class="mb-3">
-                            <label class="form-label">Phone Number</label>
-                            <input type="tel" class="form-control" id="phoneInput" 
-                                   placeholder="6281234567890" required>
+                    <h4><i class="fas fa-shield-alt me-2"></i>Security Status</h4>
+                    <div class="row text-center">
+                        <div class="col-6 mb-3">
+                            <div class="p-3 bg-light rounded">
+                                <i class="fas fa-lock fa-2x text-success mb-2"></i>
+                                <div class="fw-bold">DNS Protection</div>
+                                <small class="text-muted">Active</small>
+                            </div>
                         </div>
-                        <button type="submit" class="btn btn-primary w-100">
-                            <i class="fas fa-paper-plane me-2"></i>Start Connection
-                        </button>
-                    </form>
-                    <div id="formMessage" class="mt-3"></div>
+                        <div class="col-6 mb-3">
+                            <div class="p-3 bg-light rounded">
+                                <i class="fas fa-user-secret fa-2x text-primary mb-2"></i>
+                                <div class="fw-bold">Stealth Mode</div>
+                                <small class="text-muted">Enabled</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="p-3 bg-light rounded">
+                                <i class="fas fa-bolt fa-2x text-warning mb-2"></i>
+                                <div class="fw-bold">Fast Response</div>
+                                <small class="text-muted">Optimized</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="p-3 bg-light rounded">
+                                <i class="fas fa-sync fa-2x text-info mb-2"></i>
+                                <div class="fw-bold">Header Rotation</div>
+                                <small class="text-muted">Active</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Information -->
+        <div class="dashboard-card">
+            <h5><i class="fas fa-info-circle me-2"></i>System Information</h5>
+            <div class="row">
+                <div class="col-md-6">
+                    <table class="table table-sm">
+                        <tr>
+                            <td><strong>Platform:</strong></td>
+                            <td id="platformInfo">Loading...</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Uptime:</strong></td>
+                            <td id="uptimeInfo">Loading...</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Memory Usage:</strong></td>
+                            <td id="memoryInfo">Loading...</td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <table class="table table-sm">
+                        <tr>
+                            <td><strong>Node.js:</strong></td>
+                            <td id="nodeVersion">Loading...</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Bot Version:</strong></td>
+                            <td>2.0.0</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Security Level:</strong></td>
+                            <td><span class="badge bg-success">HIGH</span></td>
+                        </tr>
+                    </table>
                 </div>
             </div>
         </div>
@@ -128,13 +193,13 @@ const HTML_DASHBOARD = `
             <h5 class="mb-3"><i class="fas fa-bolt me-2"></i>Quick Actions</h5>
             <div class="btn-group flex-wrap">
                 <button class="btn btn-outline-primary" onclick="updateStatus()">
-                    <i class="fas fa-sync-alt me-2"></i>Refresh
+                    <i class="fas fa-sync-alt me-2"></i>Refresh Status
                 </button>
                 <button class="btn btn-outline-warning" onclick="restartBot()">
-                    <i class="fas fa-redo me-2"></i>Restart
+                    <i class="fas fa-redo me-2"></i>Restart Bot
                 </button>
-                <button class="btn btn-outline-danger" onclick="clearSession()">
-                    <i class="fas fa-trash me-2"></i>Clear Session
+                <button class="btn btn-outline-info" onclick="showSecurityInfo()">
+                    <i class="fas fa-shield-alt me-2"></i>Security Info
                 </button>
             </div>
         </div>
@@ -143,11 +208,10 @@ const HTML_DASHBOARD = `
         <div class="whatsapp-guide">
             <h5><i class="fas fa-info-circle me-2"></i>Connection Guide</h5>
             <ol class="mb-0">
-                <li>Enter your WhatsApp number</li>
-                <li>Click "Start Connection"</li>
-                <li>Wait for pairing code</li>
+                <li>Wait for QR code in terminal</li>
                 <li>Open WhatsApp → Linked Devices → Link a Device</li>
-                <li>Enter the pairing code</li>
+                <li>Scan the QR code</li>
+                <li>Connection will be established automatically</li>
             </ol>
         </div>
     </div>
@@ -167,75 +231,66 @@ const HTML_DASHBOARD = `
                     
                     // Update progress
                     const progressConfig = {
-                        'online': { width: '100%', text: 'Connected to WhatsApp' },
-                        'pairing': { width: '75%', text: 'Enter pairing code' },
-                        'connecting': { width: '50%', text: 'Connecting...' },
-                        'waiting_phone': { width: '25%', text: 'Waiting for phone number' }
+                        'online': { width: '100%', text: 'Connected to WhatsApp', badge: 'bg-success' },
+                        'pairing': { width: '75%', text: 'Scan QR code to connect', badge: 'bg-info' },
+                        'connecting': { width: '50%', text: 'Connecting to servers...', badge: 'bg-warning' },
+                        'offline': { width: '25%', text: 'Disconnected', badge: 'bg-danger' }
                     };
                     
-                    const config = progressConfig[data.connection_status] || { width: '50%', text: 'Connecting...' };
+                    const config = progressConfig[data.connection_status] || { width: '50%', text: 'Connecting...', badge: 'bg-warning' };
                     document.getElementById('progressBar').style.width = config.width;
                     document.getElementById('progressText').textContent = config.text;
+                    document.getElementById('statusBadge').className = 'badge ' + config.badge;
+
+                    // Update system info
+                    if (data.performance) {
+                        document.getElementById('memoryInfo').textContent = 
+                            Math.round(data.performance.memory.heapUsed / 1024 / 1024) + ' MB';
+                        document.getElementById('uptimeInfo').textContent = 
+                            Math.round(data.performance.uptime) + ' seconds';
+                    }
                 })
                 .catch(error => {
                     console.error('Error:', error);
+                    document.getElementById('connectionStatus').textContent = 'error';
+                    document.getElementById('statusBadge').textContent = 'Connection Error';
+                    document.getElementById('statusIndicator').className = 'status-indicator status-offline';
                 });
         }
 
         function restartBot() {
-            if (confirm('Restart the bot?')) {
+            if (confirm('Restart the bot? This will temporarily disconnect WhatsApp.')) {
                 fetch('/api/restart')
-                    .then(() => alert('Bot restarting...'))
+                    .then(() => {
+                        alert('Bot restarting...');
+                        updateStatus();
+                    })
                     .catch(() => alert('Error restarting bot'));
             }
         }
 
-        function clearSession() {
-            if (confirm('Clear session? This will require re-authentication.')) {
-                fetch('/api/clear-session', { method: 'POST' })
-                    .then(() => {
-                        alert('Session cleared');
-                        location.reload();
-                    })
-                    .catch(() => alert('Error clearing session'));
-            }
+        function showSecurityInfo() {
+            alert('Security Features:\\n• Secure DNS (DoH/DoT)\\n• Header Rotation\\n• Stealth Mode\\n• Fast Response System\\n• Anti-detection');
         }
 
-        // Handle form submission
-        document.getElementById('phoneForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const phone = document.getElementById('phoneInput').value.trim();
-            const formMessage = document.getElementById('formMessage');
-            
-            if (!phone) {
-                formMessage.innerHTML = '<div class="alert alert-danger">Please enter phone number</div>';
-                return;
-            }
-
-            fetch('/api/pair', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phoneNumber: phone })
-            })
-            .then(response => response.json())
-            .then(result => {
-                if (result.status === 'success') {
-                    formMessage.innerHTML = '<div class="alert alert-success">Phone number accepted!</div>';
-                    updateStatus();
-                } else {
-                    formMessage.innerHTML = '<div class="alert alert-danger">Error: ' + (result.error || 'Unknown error') + '</div>';
-                }
-            })
-            .catch(error => {
-                formMessage.innerHTML = '<div class="alert alert-danger">Network error</div>';
-            });
-        });
+        // Initialize system info
+        document.getElementById('platformInfo').textContent = navigator.platform;
+        document.getElementById('nodeVersion').textContent = 'Unknown';
 
         // Auto-update every 3 seconds
         setInterval(updateStatus, 3000);
         
         // Initial update
         updateStatus();
+
+        // Get Node.js version from server
+        fetch('/api/status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.versions) {
+                    document.getElementById('nodeVersion').textContent = data.versions.node;
+                }
+            });
     </script>
 </body>
 </html>
@@ -245,88 +300,92 @@ const HTML_DASHBOARD = `
 // 🚀 EXPRESS SERVER SETUP
 // ==============================
 
-// Initialize global variables
-global.botStatus = 'Initializing...';
-global.connectionStatus = 'connecting';
-global.phoneNumber = null;
-global.pairingCode = null;
-global.botInfo = null;
+// Initialize global variables jika belum ada
+if (!global.botStatus) global.botStatus = 'Initializing...';
+if (!global.connectionStatus) global.connectionStatus = 'connecting';
+if (!global.phoneNumber) global.phoneNumber = null;
+if (!global.pairingCode) global.pairingCode = null;
+if (!global.botInfo) global.botInfo = null;
 
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(express.static('public'));
+
+// Security headers
+app.use((req, res, next) => {
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    next();
+});
 
 // ==============================
-// 📍 ROUTES - FIXED
+// 📍 ROUTES - OPTIMIZED FOR KOYEB
 // ==============================
 
-// ROUTE 1: Root path - RETURN HTML DASHBOARD
+// ROUTE 1: Root path - HTML DASHBOARD
 app.get('/', (req, res) => {
     console.log(chalk.green('🌐 Serving HTML dashboard for /'));
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(HTML_DASHBOARD);
 });
 
-// ROUTE 2: API Status - RETURN JSON
+// ROUTE 2: API Status - JSON DATA
 app.get('/api/status', (req, res) => {
     res.json({
-        status: global.botStatus,
-        connection_status: global.connectionStatus,
+        status: global.botStatus || 'Initializing',
+        connection_status: global.connectionStatus || 'connecting',
         phone_number: global.phoneNumber,
         pairing_code: global.pairingCode,
         bot_info: global.botInfo,
         security: {
             dns: "secure",
             stealth: "enabled", 
-            headers: "rotating"
+            headers: "rotating",
+            level: "high"
         },
         performance: {
-            uptime: Math.floor((Date.now() - (global.webUptime || Date.now())) / 1000),
+            uptime: Math.floor(process.uptime()),
             memory: process.memoryUsage(),
             dnsCache: global.dnsCache?.stats || { hits: 0, misses: 0, keys: 0, ksize: 0, vsize: 0 }
-        }
+        },
+        versions: {
+            node: process.version,
+            platform: process.platform
+        },
+        timestamp: new Date().toISOString()
     });
 });
 
-// ROUTE 3: Pair phone number
-app.post('/api/pair', (req, res) => {
-    const { phoneNumber } = req.body;
-    
-    if (!phoneNumber) {
-        return res.status(400).json({ error: 'Phone number required' });
-    }
-
-    const cleanNumber = phoneNumber.replace(/\D/g, '');
-    if (cleanNumber.length < 8) {
-        return res.status(400).json({ error: 'Invalid phone number' });
-    }
-
-    global.phoneNumber = cleanNumber;
-    global.connectionStatus = 'waiting_phone';
-    global.botStatus = 'Waiting for pairing code...';
-
-    console.log(chalk.green(`📱 Phone number set: ${cleanNumber}`));
-
+// ROUTE 3: Health check untuk Koyeb
+app.get('/health', (req, res) => {
     res.json({ 
-        status: 'success', 
-        message: 'Phone number accepted',
-        phone: cleanNumber 
+        status: 'healthy', 
+        timestamp: new Date().toISOString(),
+        service: 'WhatsApp Bot Dashboard'
     });
 });
 
-// ROUTE 4: Clear session
-app.post('/api/clear-session', (req, res) => {
-    global.phoneNumber = null;
-    global.pairingCode = null;
-    global.botInfo = null;
-    global.connectionStatus = 'initializing';
-    global.botStatus = 'Session cleared';
-
-    console.log(chalk.yellow('🗑️ Session cleared'));
-
-    res.json({ 
-        status: 'success', 
-        message: 'Session cleared successfully' 
+// ROUTE 4: Security info
+app.get('/api/security', (req, res) => {
+    res.json({
+        features: [
+            "Secure DNS (DoH/DoT)",
+            "User-Agent Rotation", 
+            "Stealth Browser Configuration",
+            "Header Spoofing",
+            "Fast Response System",
+            "Priority Command Handling"
+        ],
+        dns_servers: [
+            "NextDNS (Secure)",
+            "Cloudflare",
+            "Google DNS", 
+            "Quad9"
+        ],
+        status: "active"
     });
 });
 
@@ -335,21 +394,24 @@ app.get('/api/restart', (req, res) => {
     global.botStatus = 'Restarting...';
     global.connectionStatus = 'connecting';
 
-    console.log(chalk.yellow('🔄 Bot restarting...'));
+    console.log(chalk.yellow('🔄 Bot restart requested via API'));
 
     res.json({ 
         status: 'success', 
-        message: 'Restart command sent' 
+        message: 'Restart command sent',
+        timestamp: new Date().toISOString()
     });
 });
 
-// ROUTE 6: Package info
-app.get('/api/package-info', (req, res) => {
+// ROUTE 6: System info
+app.get('/api/system', (req, res) => {
     res.json({
-        name: 'WhatsApp Bot',
-        version: '2.0.0',
-        author: 'Bot Developer',
-        description: 'WhatsApp Bot with Web Dashboard'
+        platform: process.platform,
+        arch: process.arch,
+        node_version: process.version,
+        memory: process.memoryUsage(),
+        uptime: process.uptime(),
+        env: process.env.NODE_ENV || 'development'
     });
 });
 
@@ -361,13 +423,13 @@ function setPairingCode(code) {
     global.pairingCode = code;
     global.connectionStatus = 'pairing';
     global.botStatus = 'Pairing code generated';
-    console.log(chalk.green(`🔐 Pairing code: ${code}`));
+    console.log(chalk.green(`🔐 Pairing code set: ${code}`));
 }
 
 function setConnectionStatus(status, message = '') {
     global.connectionStatus = status;
     global.botStatus = message || status;
-    console.log(chalk.blue(`🔌 Status: ${status} - ${message}`));
+    console.log(chalk.blue(`🔌 Status updated: ${status} - ${message}`));
 }
 
 function setBotInfo(info) {
@@ -394,7 +456,7 @@ function getRateLimitInfo() {
 }
 
 // ==============================
-// 🚀 START SERVER
+// 🚀 START SERVER - KOYEB COMPATIBLE
 // ==============================
 
 async function startServer(port = null) {
@@ -410,7 +472,7 @@ async function startServer(port = null) {
     return new Promise((resolve, reject) => {
         server = createServer(app);
         
-        server.listen(CURRENT_PORT, (err) => {
+        server.listen(CURRENT_PORT, '0.0.0.0', (err) => {
             if (err) {
                 if (err.code === 'EADDRINUSE') {
                     console.log(chalk.yellow(`🔄 Port ${CURRENT_PORT} busy, trying ${CURRENT_PORT + 1}...`));
@@ -426,11 +488,11 @@ async function startServer(port = null) {
             console.log(chalk.green('╔═══════════════════════════════════════╗'));
             console.log(chalk.green('║        WhatsApp Bot Dashboard        ║'));
             console.log(chalk.green('╚═══════════════════════════════════════╝'));
-            console.log(chalk.cyan(`🌐 Dashboard URL: http://localhost:${CURRENT_PORT}`));
-            console.log(chalk.blue(`📊 API Status: http://localhost:${CURRENT_PORT}/api/status`));
-            console.log(chalk.green(`🛡️ Security: DNS Protection + Stealth Mode`));
+            console.log(chalk.cyan(`🌐 Dashboard URL: http://0.0.0.0:${CURRENT_PORT}`));
+            console.log(chalk.blue(`📊 API Status: http://0.0.0.0:${CURRENT_PORT}/api/status`));
+            console.log(chalk.green(`❤️ Health Check: http://0.0.0.0:${CURRENT_PORT}/health`));
             console.log(chalk.yellow(`⚡ Auto-refresh: Every 3 seconds`));
-            console.log(chalk.magenta(`📱 Ready for WhatsApp connection`));
+            console.log(chalk.magenta(`🚀 Ready for Koyeb deployment`));
             
             resolve(CURRENT_PORT);
         });
@@ -453,5 +515,6 @@ module.exports = {
 
 // Start server if run directly
 if (require.main === module) {
+    console.log(chalk.blue('🚀 Starting standalone web server...'));
     startServer().catch(console.error);
 }
