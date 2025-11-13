@@ -21,7 +21,7 @@ let CURRENT_PORT = process.env.PORT || 3000;
 let isServerRunning = false;
 
 // ==============================
-// 🌐 HTML DASHBOARD - OPTIMIZED FOR KOYEB
+// 🌐 HTML DASHBOARD
 // ==============================
 
 const HTML_DASHBOARD = `
@@ -225,11 +225,9 @@ const HTML_DASHBOARD = `
                     document.getElementById('connectionStatus').textContent = data.connection_status;
                     document.getElementById('statusBadge').textContent = data.status;
                     
-                    // Update status indicator
                     const indicator = document.getElementById('statusIndicator');
                     indicator.className = 'status-indicator status-' + data.connection_status;
                     
-                    // Update progress
                     const progressConfig = {
                         'online': { width: '100%', text: 'Connected to WhatsApp', badge: 'bg-success' },
                         'pairing': { width: '75%', text: 'Scan QR code to connect', badge: 'bg-info' },
@@ -242,7 +240,6 @@ const HTML_DASHBOARD = `
                     document.getElementById('progressText').textContent = config.text;
                     document.getElementById('statusBadge').className = 'badge ' + config.badge;
 
-                    // Update system info
                     if (data.performance) {
                         document.getElementById('memoryInfo').textContent = 
                             Math.round(data.performance.memory.heapUsed / 1024 / 1024) + ' MB';
@@ -273,17 +270,12 @@ const HTML_DASHBOARD = `
             alert('Security Features:\\n• Secure DNS (DoH/DoT)\\n• Header Rotation\\n• Stealth Mode\\n• Fast Response System\\n• Anti-detection');
         }
 
-        // Initialize system info
         document.getElementById('platformInfo').textContent = navigator.platform;
         document.getElementById('nodeVersion').textContent = 'Unknown';
 
-        // Auto-update every 3 seconds
         setInterval(updateStatus, 3000);
-        
-        // Initial update
         updateStatus();
 
-        // Get Node.js version from server
         fetch('/api/status')
             .then(response => response.json())
             .then(data => {
@@ -300,19 +292,16 @@ const HTML_DASHBOARD = `
 // 🚀 EXPRESS SERVER SETUP
 // ==============================
 
-// Initialize global variables jika belum ada
 if (!global.botStatus) global.botStatus = 'Initializing...';
 if (!global.connectionStatus) global.connectionStatus = 'connecting';
 if (!global.phoneNumber) global.phoneNumber = null;
 if (!global.pairingCode) global.pairingCode = null;
 if (!global.botInfo) global.botInfo = null;
 
-// Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
-// Security headers
 app.use((req, res, next) => {
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -322,17 +311,15 @@ app.use((req, res, next) => {
 });
 
 // ==============================
-// 📍 ROUTES - OPTIMIZED FOR KOYEB
+// 📍 ROUTES
 // ==============================
 
-// ROUTE 1: Root path - HTML DASHBOARD
 app.get('/', (req, res) => {
     console.log(chalk.green('🌐 Serving HTML dashboard for /'));
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(HTML_DASHBOARD);
 });
 
-// ROUTE 2: API Status - JSON DATA
 app.get('/api/status', (req, res) => {
     res.json({
         status: global.botStatus || 'Initializing',
@@ -359,7 +346,6 @@ app.get('/api/status', (req, res) => {
     });
 });
 
-// ROUTE 3: Health check untuk Koyeb
 app.get('/health', (req, res) => {
     res.json({ 
         status: 'healthy', 
@@ -368,7 +354,6 @@ app.get('/health', (req, res) => {
     });
 });
 
-// ROUTE 4: Security info
 app.get('/api/security', (req, res) => {
     res.json({
         features: [
@@ -389,7 +374,6 @@ app.get('/api/security', (req, res) => {
     });
 });
 
-// ROUTE 5: Restart bot
 app.get('/api/restart', (req, res) => {
     global.botStatus = 'Restarting...';
     global.connectionStatus = 'connecting';
@@ -403,7 +387,6 @@ app.get('/api/restart', (req, res) => {
     });
 });
 
-// ROUTE 6: System info
 app.get('/api/system', (req, res) => {
     res.json({
         platform: process.platform,
@@ -456,7 +439,7 @@ function getRateLimitInfo() {
 }
 
 // ==============================
-// 🚀 START SERVER - KOYEB COMPATIBLE
+// 🚀 START SERVER
 // ==============================
 
 async function startServer(port = null) {
@@ -499,10 +482,6 @@ async function startServer(port = null) {
     });
 }
 
-// ==============================
-// 📦 EXPORT MODULE
-// ==============================
-
 module.exports = { 
     app, 
     startServer, 
@@ -513,7 +492,6 @@ module.exports = {
     getRateLimitInfo
 };
 
-// Start server if run directly
 if (require.main === module) {
     console.log(chalk.blue('🚀 Starting standalone web server...'));
     startServer().catch(console.error);
