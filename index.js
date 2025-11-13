@@ -83,7 +83,7 @@ try {
 // Import dan setup web server
 let webServer;
 try {
-    const { startServer, setConnectionStatus, setBotInfo, setPairingCode } = require('./server');
+    const { startServer, setConnectionStatus, setBotInfo, setPairingCode, setSessionIssues } = require('./server');
     
     // Initialize web server
     const initWebServer = async () => {
@@ -91,15 +91,17 @@ try {
             const port = process.env.PORT || 3000;
             await startServer(port);
             console.log(chalk.green(`🌐 Web Dashboard running on port ${port}`));
+            
+            // Export functions untuk diakses oleh WhatsApp bot
+            global.setConnectionStatus = setConnectionStatus;
+            global.setBotInfo = setBotInfo;
+            global.setPairingCode = setPairingCode;
+            global.setSessionIssues = setSessionIssues;
+            
         } catch (error) {
             console.log(chalk.yellow('⚠️ Web server failed, continuing without dashboard...'));
         }
     };
-    
-    // Export functions untuk diakses oleh WhatsApp bot
-    global.setConnectionStatus = setConnectionStatus;
-    global.setBotInfo = setBotInfo;
-    global.setPairingCode = setPairingCode;
     
     // Start web server
     initWebServer();
@@ -476,7 +478,7 @@ async function startNazeBot() {
         
         const naze = await createSecureWhatsAppConnection(version, state, logger);
         
-        // Enhanced connection handler
+        // Enhanced connection handler dengan web dashboard integration
         naze.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
             
@@ -531,6 +533,7 @@ async function startNazeBot() {
                 global.pairingCode = null;
                 sessionErrorCount = 0;
                 
+                // Update web dashboard
                 if (global.setConnectionStatus) {
                     global.setConnectionStatus('online', 'Connected to WhatsApp');
                 }
@@ -590,6 +593,12 @@ async function startNazeBot() {
         
     } catch (error) {
         console.error(chalk.red('❌ Failed to start WhatsApp bot:'), error);
+        
+        // Update web dashboard about connection issues
+        if (global.setSessionIssues) {
+            global.setSessionIssues(true);
+        }
+        
         setTimeout(() => {
             startNazeBot();
         }, 5000);
@@ -613,8 +622,10 @@ async function main() {
         // Initialize secure systems pertama
         await initializeSecureDNS();
         
+        // Tunggu web server mulai
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
         // Start WhatsApp bot
-        await new Promise(resolve => setTimeout(resolve, 1000));
         await startNazeBot();
         
         console.log(chalk.green(`
