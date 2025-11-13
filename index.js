@@ -453,7 +453,7 @@ function handleConnectionRecovery(reason) {
 // ==============================
 
 // Simple Web Dashboard untuk monitoring
-function startWebDashboard(port = 3000) {
+function startWebDashboard(port = 8000) {
     const app = express();
     
     app.use(express.json());
@@ -727,3 +727,4 @@ module.exports = {
     initializeSecureDNS,
     startNazeBot
 };
+
