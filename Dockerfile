@@ -28,11 +28,11 @@ RUN mkdir -p views nazedev session sessions tmp
 # Set proper permissions
 RUN chmod -R 755 nazedev session sessions tmp
 
-EXPOSE 443
+EXPOSE 3000
 
 # Health check - using /health endpoint
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:443/health || exit 1
+    CMD curl -f http://localhost:3000/health || exit 1
 
 # Start application
 CMD ["npm", "start"]
