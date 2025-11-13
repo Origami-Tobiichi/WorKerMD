@@ -3,7 +3,7 @@ services:
   web:
     build: .
     ports:
-      - "443"
+      - "300"
     volumes:
       - .:/code
       - logvolume01:/var/log
@@ -14,3 +14,4 @@ services:
 volumes:
 
   logvolume01: {}
+
