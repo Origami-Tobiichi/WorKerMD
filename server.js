@@ -111,7 +111,7 @@ async function initializeSecureDNS() {
     }
 }
 
-//  PERBAIKAN: Rate limiting system yang lebih ketat
+// Rate limiting system
 const pairingRateLimit = {
     lastRequest: 0,
     minInterval: 60000,
@@ -123,7 +123,7 @@ const pairingRateLimit = {
     globalCooldown: 0
 };
 
-// Global variables untuk management
+// Initialize global variables
 global.botStatus = global.botStatus || 'Initializing...';
 global.connectionStatus = global.connectionStatus || 'initializing';
 global.phoneNumber = global.phoneNumber || null;
@@ -197,24 +197,8 @@ if (!fs.existsSync(publicPath)) {
     fs.mkdirSync(publicPath, { recursive: true });
 }
 
-// Apply security headers middleware
-app.use((req, res, next) => {
-    // Set security headers
-    Object.entries(SECURITY_HEADERS).forEach(([key, value]) => {
-        res.setHeader(key, value);
-    });
-    
-    // Additional security headers
-    res.setHeader('X-Powered-By', 'Secure Server');
-    res.setHeader('X-Security-Mode', 'DNS-Protected');
-    
-    next();
-});
-
-app.use(express.static(publicPath));
-
-//  HTML CONTENT LENGKAP DENGAN SECURITY FEATURES
-const htmlContent = `<!DOCTYPE html>
+// HTML CONTENT LENGKAP DENGAN SECURITY FEATURES
+const HTML_DASHBOARD = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -377,6 +361,20 @@ const htmlContent = `<!DOCTYPE html>
         .security-status-card::before {
             background: linear-gradient(90deg, var(--security-color), #8b5cf6);
         }
+        .fade-in {
+            animation: fadeIn 0.8s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .whatsapp-guide {
+            background: linear-gradient(135deg, #25D366, #128C7E);
+            color: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 15px 0;
+        }
     </style>
 </head>
 <body>
@@ -416,7 +414,7 @@ const htmlContent = `<!DOCTYPE html>
                             <small class="text-muted">DNS: <span id="dnsStatus">Secure</span></small>
                         </div>
                         <div class="col-md-2">
-                            <small class="text-muted">Mode: <span id="securityMode">Stealth</span></span></small>
+                            <small class="text-muted">Mode: <span id="securityMode">Stealth</span></small>
                         </div>
                     </div>
                 </div>
@@ -471,7 +469,7 @@ const htmlContent = `<!DOCTYPE html>
             </div>
         </div>
 
-        <!-- Existing content remains the same but with security enhancements -->
+        <!-- Connection Guide -->
         <div class="whatsapp-guide fade-in mb-4" id="connectionGuide">
             <h5 class="mb-3"><i class="fas fa-info-circle me-2"></i>Secure Connection Guide</h5>
             <ol>
@@ -491,23 +489,21 @@ const htmlContent = `<!DOCTYPE html>
             </div>
         </div>
 
-        <!-- Rest of the existing HTML content remains the same -->
-        <!-- Only showing the modified parts for brevity -->
-
-        <div class="alert rate-limit-alert mb-4" id="rateLimitAlert" style="display: none;">
+        <!-- Rate Limit Alert -->
+        <div class="alert alert-warning mb-4" id="rateLimitAlert" style="display: none;">
             <h5 class="mb-2"><i class="fas fa-shield-alt me-2"></i>Security Protection Active</h5>
             <p class="mb-3" id="rateLimitMessage">Too many pairing attempts detected. Security system activated to prevent restrictions.</p>
             <div class="btn-group">
                 <button class="btn btn-sm btn-security" id="waitForAutoReset">
                     <i class="fas fa-clock me-1"></i>Auto-reset in <span id="countdownTimer">300</span>s
                 </button>
-                <button class="btn btn-sm btn-outline-light" id="manualResetBtn">
+                <button class="btn btn-sm btn-outline-dark" id="manualResetBtn">
                     <i class="fas fa-sync me-1"></i>Reset Now
                 </button>
             </div>
         </div>
 
-        <!-- Modified connection status card with security info -->
+        <!-- Connection Status -->
         <div class="row">
             <div class="col-md-6">
                 <div class="dashboard-card h-100 fade-in connection-status-card">
@@ -538,7 +534,7 @@ const htmlContent = `<!DOCTYPE html>
 
                     <div class="connection-progress mt-4">
                         <div class="progress mb-3" style="height: 10px;">
-                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-security" id="progressBar" style="width: 0%">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" id="progressBar" style="width: 0%; background: linear-gradient(135deg, var(--security-color), #8b5cf6);">
                             </div>
                         </div>
                         <div class="small text-muted text-center" id="progressText">
@@ -560,13 +556,13 @@ const htmlContent = `<!DOCTYPE html>
                                     </label>
                                     <div class="input-group">
                                         <span class="input-group-text bg-light border-end-0">
-                                            <i class="fas fa-lock text-security"></i>
+                                            <i class="fas fa-lock" style="color: var(--security-color);"></i>
                                         </span>
                                         <input type="tel" class="form-control border-start-0" id="phoneInput" 
                                                placeholder="6281234567890 or 081234567890" required>
                                     </div>
                                     <div class="form-text">
-                                        <i class="fas fa-shield-alt me-1 text-security"></i>
+                                        <i class="fas fa-shield-alt me-1" style="color: var(--security-color);"></i>
                                         Your number is protected with secure DNS and encryption
                                     </div>
                                 </div>
@@ -581,8 +577,8 @@ const htmlContent = `<!DOCTYPE html>
             </div>
         </div>
 
-        <!-- Quick Actions dengan security features -->
-        <div class="dashboard-card mt-4 fade-in" id="quickActions" style="display: none;">
+        <!-- Quick Actions -->
+        <div class="dashboard-card mt-4 fade-in" id="quickActions">
             <h5 class="mb-3"><i class="fas fa-bolt me-2"></i>Security Actions</h5>
             <div class="row">
                 <div class="col-md-3 mb-2">
@@ -641,10 +637,6 @@ const htmlContent = `<!DOCTYPE html>
                 </div>
             </div>
         </div>
-
-        <!-- Rest of the existing HTML content -->
-        <!-- ... -->
-
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -697,31 +689,165 @@ const htmlContent = `<!DOCTYPE html>
             }
         }
 
-        // Event listener untuk security check
-        document.getElementById('checkSecurityBtn')?.addEventListener('click', performSecurityCheck);
+        // Show notification function
+        function showNotification(message, type = 'info') {
+            const notificationArea = document.getElementById('notificationArea');
+            const alertClass = {
+                'success': 'alert-success',
+                'warning': 'alert-warning',
+                'danger': 'alert-danger',
+                'info': 'alert-info'
+            }[type] || 'alert-info';
 
-        // Existing JavaScript code dengan security enhancements
-        // ...
+            const notification = document.createElement('div');
+            notification.className = `alert ${alertClass} alert-dismissible fade show`;
+            notification.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            notificationArea.appendChild(notification);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 5000);
+        }
 
-        // Modified status update untuk include security info
+        // Update status function
+        function updateStatus() {
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    processStatusUpdate(data);
+                })
+                .catch(error => {
+                    console.error('Error fetching status:', error);
+                    document.getElementById('connectionStatusText').textContent = 'error';
+                    document.getElementById('statusBadge').textContent = 'Connection Error';
+                    document.getElementById('statusIndicator').className = 'status-indicator status-error';
+                });
+        }
+
         function processStatusUpdate(data) {
             const oldStatus = currentStatus;
             currentStatus = data.connection_status;
 
-            updateStatusElements(data);
-            
+            // Update status elements
+            document.getElementById('connectionStatusText').textContent = currentStatus;
+            document.getElementById('statusBadge').textContent = data.status;
+            document.getElementById('statusIndicator').className = 'status-indicator status-' + currentStatus;
+
             // Update security information
             if (data.security_info) {
                 updateSecurityStatus(data.security_info);
             }
+
+            // Update progress bar based on status
+            const progressConfig = {
+                'online': { width: '100%', text: 'Securely Connected to WhatsApp', badge: 'bg-success' },
+                'pairing': { width: '75%', text: 'Enter secure pairing code', badge: 'bg-info' },
+                'connecting': { width: '50%', text: 'Establishing secure connection...', badge: 'bg-warning' },
+                'waiting_phone': { width: '25%', text: 'Waiting for phone number', badge: 'bg-primary' },
+                'offline': { width: '10%', text: 'Disconnected - Security mode active', badge: 'bg-danger' }
+            };
             
-            // Existing status update code...
-            if (data.phone_number) {
-                handlePhoneNumberUpdate(data.phone_number);
+            const config = progressConfig[currentStatus] || { width: '0%', text: 'Initializing...', badge: 'bg-secondary' };
+            document.getElementById('progressBar').style.width = config.width;
+            document.getElementById('progressText').textContent = config.text;
+            document.getElementById('statusBadge').className = 'badge ' + config.badge;
+
+            // Handle rate limiting
+            if (data.rate_limited) {
+                document.getElementById('rateLimitAlert').style.display = 'block';
+                document.getElementById('rateLimitMessage').textContent = data.rate_limited.message;
+                startRateLimitCountdown(data.rate_limited.remainingTime);
+            } else {
+                document.getElementById('rateLimitAlert').style.display = 'none';
+            }
+
+            // Update uptime
+            if (data.uptime) {
+                document.getElementById('uptime').textContent = data.uptime;
+            }
+        }
+
+        function startRateLimitCountdown(seconds) {
+            const timerElement = document.getElementById('countdownTimer');
+            let timeLeft = seconds;
+            
+            if (rateLimitCountdown) {
+                clearInterval(rateLimitCountdown);
             }
             
-            // ... rest of existing code
+            rateLimitCountdown = setInterval(() => {
+                timeLeft--;
+                timerElement.textContent = timeLeft;
+                
+                if (timeLeft <= 0) {
+                    clearInterval(rateLimitCountdown);
+                    document.getElementById('rateLimitAlert').style.display = 'none';
+                    updateStatus();
+                }
+            }, 1000);
         }
+
+        // Event listeners
+        document.getElementById('phoneForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const phone = document.getElementById('phoneInput').value.trim();
+            const formMessage = document.getElementById('formMessage');
+            
+            if (!phone) {
+                formMessage.innerHTML = '<div class="alert alert-danger">Please enter phone number</div>';
+                return;
+            }
+
+            fetch('/api/pair', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phoneNumber: phone })
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.status === 'success') {
+                    formMessage.innerHTML = '<div class="alert alert-success">Secure pairing initiated!</div>';
+                    updateStatus();
+                } else {
+                    formMessage.innerHTML = '<div class="alert alert-danger">Error: ' + (result.error || 'Unknown error') + '</div>';
+                }
+            })
+            .catch(error => {
+                formMessage.innerHTML = '<div class="alert alert-danger">Network error</div>';
+            });
+        });
+
+        document.getElementById('checkSecurityBtn').addEventListener('click', performSecurityCheck);
+        document.getElementById('quickRestartBtn').addEventListener('click', function() {
+            if (confirm('Restart the bot? This will temporarily disconnect WhatsApp.')) {
+                fetch('/api/restart')
+                    .then(() => {
+                        showNotification('Bot restarting...', 'warning');
+                        updateStatus();
+                    })
+                    .catch(() => showNotification('Error restarting bot', 'danger'));
+            }
+        });
+
+        document.getElementById('manualResetBtn').addEventListener('click', function() {
+            fetch('/api/reset-rate-limit', { method: 'POST' })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.status === 'success') {
+                        showNotification('Security system reset successfully', 'success');
+                        document.getElementById('rateLimitAlert').style.display = 'none';
+                        updateStatus();
+                    }
+                })
+                .catch(() => showNotification('Error resetting security system', 'danger'));
+        });
 
         // Initialize security status on load
         document.addEventListener('DOMContentLoaded', function() {
@@ -732,22 +858,37 @@ const htmlContent = `<!DOCTYPE html>
                 performSecurityCheck();
             }, 2000);
             
-            // Existing initialization code...
+            // Start polling for status updates
+            setInterval(updateStatus, CONFIG.POLLING_INTERVAL_NORMAL);
+            updateStatus();
         });
-
-        // Rest of existing JavaScript code remains the same
-        // ...
     </script>
 </body>
 </html>`;
 
+// Write HTML file
 const htmlPath = path.join(publicPath, 'index.html');
-fs.writeFileSync(htmlPath, htmlContent);
+fs.writeFileSync(htmlPath, HTML_DASHBOARD);
+
+// Apply security headers middleware
+app.use((req, res, next) => {
+    // Set security headers
+    Object.entries(SECURITY_HEADERS).forEach(([key, value]) => {
+        res.setHeader(key, value);
+    });
+    
+    // Additional security headers
+    res.setHeader('X-Powered-By', 'Secure Server');
+    res.setHeader('X-Security-Mode', 'DNS-Protected');
+    
+    next();
+});
 
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(publicPath));
 
-//  FUNGSI BARU: Security status check
+// Security check function
 function checkSecurityStatus() {
     return {
         dns_protection: global.securitySettings?.secureDNS || true,
@@ -759,7 +900,7 @@ function checkSecurityStatus() {
     };
 }
 
-//  FUNGSI BARU: Format dan validasi nomor di server
+// Format dan validasi nomor di server
 function formatPhoneNumber(phoneNumber) {
     if (!phoneNumber) return null;
     
@@ -879,28 +1020,41 @@ function formatTime(seconds) {
     return `${secs}s`;
 }
 
-// Apply security headers to all routes
-app.use((req, res, next) => {
-    // Security headers
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('X-XSS-Protection', '1; mode=block');
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
-    
-    // Custom security headers
-    res.setHeader('X-Security-Mode', 'DNS-Protected');
-    res.setHeader('X-Bot-Version', 'Secure-Edition');
-    
-    next();
-});
+// ==============================
+// 📍 ROUTES
+// ==============================
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(publicPath, 'index.html'));
 });
 
-//  ENDPOINT BARU: Security status
+// API Status
+app.get('/api/status', (req, res) => {
+    const now = Date.now();
+    const isRateLimited = pairingRateLimit.attempts >= pairingRateLimit.maxAttempts || now < pairingRateLimit.blockUntil;
+    const remainingTime = isRateLimited ? 
+        Math.ceil(((pairingRateLimit.blockUntil || pairingRateLimit.resetTime + pairingRateLimit.cooldownPeriod) - now) / 1000) : 0;
+    
+    res.json({
+        status: global.botStatus,
+        connection_status: global.connectionStatus,
+        phone_number: global.phoneNumber,
+        pairing_code: global.pairingCode,
+        bot_info: global.botInfo,
+        session_issues: global.sessionIssues,
+        current_port: CURRENT_PORT,
+        uptime: Math.floor(process.uptime()),
+        security_info: checkSecurityStatus(),
+        rate_limited: isRateLimited ? {
+            attempts: pairingRateLimit.attempts,
+            maxAttempts: pairingRateLimit.maxAttempts,
+            remainingTime: remainingTime > 0 ? remainingTime : 0,
+            security_level: 'HIGH'
+        } : null
+    });
+});
+
+// Security Status
 app.get('/api/security-status', (req, res) => {
     const securityStatus = checkSecurityStatus();
     
@@ -920,7 +1074,7 @@ app.get('/api/security-status', (req, res) => {
     });
 });
 
-//  ENDPOINT BARU: DNS status
+// DNS Status
 app.get('/api/dns-status', async (req, res) => {
     try {
         const testDomains = ['google.com', 'whatsapp.com', 'cloudflare.com'];
@@ -958,39 +1112,17 @@ app.get('/api/dns-status', async (req, res) => {
     }
 });
 
-// Existing endpoints dengan security enhancements
-app.get('/api/status', (req, res) => {
-    const now = Date.now();
-    const isRateLimited = pairingRateLimit.attempts >= pairingRateLimit.maxAttempts || now < pairingRateLimit.blockUntil;
-    const remainingTime = isRateLimited ? 
-        Math.ceil(((pairingRateLimit.blockUntil || pairingRateLimit.resetTime + pairingRateLimit.cooldownPeriod) - now) / 1000) : 0;
-    
-    res.json({
-        status: global.botStatus,
-        connection_status: global.connectionStatus,
-        phone_number: global.phoneNumber,
-        pairing_code: global.pairingCode,
-        bot_info: global.botInfo,
-        session_issues: global.sessionIssues,
-        current_port: CURRENT_PORT,
-        uptime: Math.floor((Date.now() - (global.webUptime || Date.now())) / 1000),
-        security_info: checkSecurityStatus(),
-        rate_limited: isRateLimited ? {
-            attempts: pairingRateLimit.attempts,
-            maxAttempts: pairingRateLimit.maxAttempts,
-            remainingTime: remainingTime > 0 ? remainingTime : 0,
-            security_level: 'HIGH'
-        } : null,
-        rate_limit_info: {
-            attempts: pairingRateLimit.attempts,
-            maxAttempts: pairingRateLimit.maxAttempts,
-            lastRequest: pairingRateLimit.lastRequest,
-            resetTime: pairingRateLimit.resetTime,
-            blockUntil: pairingRateLimit.blockUntil
-        }
+// Health Check untuk Koyeb
+app.get('/health', (req, res) => {
+    res.json({ 
+        status: 'healthy', 
+        timestamp: new Date().toISOString(),
+        service: 'WhatsApp Bot Dashboard',
+        security: 'ENABLED'
     });
 });
 
+// Package Info
 app.get('/api/package-info', (req, res) => {
     res.json({
         ...packageInfo,
@@ -1005,6 +1137,7 @@ app.get('/api/package-info', (req, res) => {
     });
 });
 
+// Pair Phone Number
 app.post('/api/pair', checkRateLimit, (req, res) => {
     let { phoneNumber } = req.body;
     
@@ -1050,7 +1183,7 @@ app.post('/api/pair', checkRateLimit, (req, res) => {
     });
 });
 
-// Existing endpoints remain the same but with security logging
+// Reset Rate Limit
 app.post('/api/reset-rate-limit', (req, res) => {
     const now = Date.now();
     
@@ -1075,7 +1208,7 @@ app.post('/api/reset-rate-limit', (req, res) => {
     });
 });
 
-// Existing functions remain the same but with security enhancements
+// Clear Session Files
 function clearSessionFiles() {
     return new Promise((resolve, reject) => {
         console.log(chalk.yellow('🛡️ Clearing session files with security cleanup...'));
@@ -1125,7 +1258,7 @@ function clearSessionFiles() {
     });
 }
 
-// Existing endpoints dengan security logging
+// Clear Session
 app.post('/api/clear-session', async (req, res) => {
     try {
         await clearSessionFiles();
@@ -1157,29 +1290,36 @@ app.post('/api/clear-session', async (req, res) => {
     }
 });
 
-// Existing management endpoints remain the same
-// ... (all the existing management endpoints from previous code)
-
-app.post('/api/quick-restart', (req, res) => {
-    console.log(chalk.yellow('🛡️ Secure quick restart requested...'));
-    
+// Restart Bot
+app.get('/api/restart', (req, res) => {
     global.botStatus = 'Secure quick restarting...';
     global.connectionStatus = 'connecting';
     
+    console.log(chalk.yellow('🛡️ Secure quick restart requested...'));
+
     res.json({ 
         status: 'success', 
         message: 'Secure quick restart initiated',
         security: 'MAINTAINED'
     });
-    
-    if (typeof global.quickRestart === 'function') {
-        setTimeout(() => {
-            global.quickRestart();
-        }, 1000);
-    }
 });
 
-// Export functions dengan security info
+// System Info
+app.get('/api/system', (req, res) => {
+    res.json({
+        platform: process.platform,
+        arch: process.arch,
+        node_version: process.version,
+        memory: process.memoryUsage(),
+        uptime: process.uptime(),
+        env: process.env.NODE_ENV || 'development'
+    });
+});
+
+// ==============================
+// 🔧 MANAGEMENT FUNCTIONS
+// ==============================
+
 function setPairingCode(code) {
     global.pairingCode = code;
     global.connectionStatus = 'pairing';
@@ -1223,8 +1363,19 @@ function getRateLimitInfo() {
     };
 }
 
-async function startServer() {
-    if (isServerRunning) return CURRENT_PORT;
+// ==============================
+// 🚀 START SERVER
+// ==============================
+
+async function startServer(port = null) {
+    if (isServerRunning) {
+        console.log(chalk.yellow('⚠️ Server is already running'));
+        return CURRENT_PORT;
+    }
+
+    if (port) {
+        CURRENT_PORT = port;
+    }
 
     try {
         // Initialize secure DNS first
@@ -1235,15 +1386,20 @@ async function startServer() {
         
         return new Promise((resolve, reject) => {
             server = createServer(app);
-            server.listen(CURRENT_PORT, () => {
-                console.log(chalk.green(`🌐 Secure Web Dashboard running on http://localhost:${CURRENT_PORT}`));
-                console.log(chalk.blue(`📊 Dashboard: http://localhost:${CURRENT_PORT}`));
-                console.log(chalk.blue(`🔒 Security Status: http://localhost:${CURRENT_PORT}/api/security-status`));
-                console.log(chalk.blue(`🌐 DNS Status: http://localhost:${CURRENT_PORT}/api/dns-status`));
+            server.listen(CURRENT_PORT, '0.0.0.0', () => {
+                console.log(chalk.green('╔═══════════════════════════════════════╗'));
+                console.log(chalk.green('║        WhatsApp Bot Dashboard        ║'));
+                console.log(chalk.green('╚═══════════════════════════════════════╝'));
+                console.log(chalk.cyan(`🌐 Dashboard URL: http://0.0.0.0:${CURRENT_PORT}`));
+                console.log(chalk.blue(`📊 API Status: http://0.0.0.0:${CURRENT_PORT}/api/status`));
+                console.log(chalk.green(`❤️ Health Check: http://0.0.0.0:${CURRENT_PORT}/health`));
+                console.log(chalk.blue(`🔒 Security Status: http://0.0.0.0:${CURRENT_PORT}/api/security-status`));
+                console.log(chalk.blue(`🌐 DNS Status: http://0.0.0.0:${CURRENT_PORT}/api/dns-status`));
                 console.log(chalk.yellow(`🛡️ Security Protection: Active (${pairingRateLimit.maxAttempts} attempts max, ${pairingRateLimit.minInterval/1000}s cooldown)`));
                 console.log(chalk.green(`🔐 DNS Protection: NextDNS + Cloudflare + Google`));
                 console.log(chalk.magenta(`🕵️ Stealth Mode: ${global.securitySettings?.stealthMode ? 'Enabled' : 'Disabled'}`));
                 console.log(chalk.cyan(`⚡ Fast Response: Priority System Active`));
+                
                 isServerRunning = true;
                 global.webUptime = Date.now();
                 resolve(CURRENT_PORT);
