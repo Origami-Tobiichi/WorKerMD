@@ -4,7 +4,7 @@ const path = require('path');
 const http = require('http');
 
 const app = express();
-const PORT = process.env.PORT || 8000;
+const PORT = process.env.PORT || 443;
 
 // Middleware untuk parsing
 app.use(express.json());
