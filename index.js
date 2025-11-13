@@ -22,9 +22,12 @@ try {
     const Baileys = require('@whiskeysockets/baileys');
     
     // Handle different versions of Baileys
-    makeWASocket = Baileys.default || Baileys.makeWASocket;
+    makeWASocket = Baileys.default?.makeWASocket || Baileys.makeWASocket;
     useMultiFileAuthState = Baileys.useMultiFileAuthState;
-    Browsers = Baileys.Browsers || { ubuntu: () => ['Ubuntu', 'Chrome', '1.0'] };
+    Browsers = Baileys.Browsers || { 
+        ubuntu: () => ['Ubuntu', 'Chrome', '1.0'],
+        macos: () => ['macOS', 'Chrome', '1.0'] 
+    };
     DisconnectReason = Baileys.DisconnectReason;
     makeInMemoryStore = Baileys.makeInMemoryStore;
     makeCacheableSignalKeyStore = Baileys.makeCacheableSignalKeyStore;
@@ -87,6 +90,129 @@ const store = makeInMemoryStore ? makeInMemoryStore({ logger: pino().child({ lev
 const msgRetryCounterCache = new NodeCache();
 
 // ==============================
+// 🔧 UTILITY FUNCTIONS
+// ==============================
+
+function getStatusMessage(connection) {
+    const statusMap = {
+        'connecting': 'Menghubungkan ke WhatsApp...',
+        'open': 'Terhubung ke WhatsApp',
+        'close': 'Koneksi terputus',
+        'offline': 'Offline',
+        'pairing': 'Pairing code tersedia - masukkan di WhatsApp',
+        'waiting_pairing': 'Menunggu pembuatan pairing code'
+    };
+    return statusMap[connection] || connection;
+}
+
+function handleDisconnect(reason, naze) {
+    console.log(chalk.yellow('🔄 Handling disconnect...'));
+    
+    const reasonHandlers = {
+        [DisconnectReason.connectionLost]: () => {
+            console.log('🔌 Koneksi terputus, mencoba kembali...');
+            setTimeout(startNazeBot, 5000);
+        },
+        [DisconnectReason.connectionClosed]: () => {
+            console.log('🔌 Koneksi ditutup, mencoba kembali...');
+            setTimeout(startNazeBot, 5000);
+        },
+        [DisconnectReason.restartRequired]: () => {
+            console.log('🔄 Restart diperlukan...');
+            setTimeout(startNazeBot, 5000);
+        },
+        [DisconnectReason.timedOut]: () => {
+            console.log('⏰ Timeout, mencoba kembali...');
+            setTimeout(startNazeBot, 5000);
+        },
+        [DisconnectReason.loggedOut]: () => {
+            console.log('🚪 Logged out, menghapus session...');
+            exec('rm -rf ./nazedev/*', () => {
+                setTimeout(startNazeBot, 3000);
+            });
+        },
+        [DisconnectReason.badSession]: () => {
+            console.log('🗑️ Session rusak, menghapus dan restart...');
+            exec('rm -rf ./nazedev/*', () => {
+                setTimeout(startNazeBot, 3000);
+            });
+        },
+        [DisconnectReason.connectionReplaced]: () => {
+            console.log('🔄 Koneksi digantikan, menutup session...');
+            process.exit(0);
+        },
+        [DisconnectReason.forbidden]: () => {
+            console.log('🚫 Akses ditolak, session diblokir...');
+            exec('rm -rf ./nazedev/*', () => {
+                process.exit(1);
+            });
+        },
+        [DisconnectReason.multideviceMismatch]: () => {
+            console.log('📱 Multi-device mismatch, menghapus session...');
+            exec('rm -rf ./nazedev/*', () => {
+                process.exit(0);
+            });
+        }
+    };
+
+    if (reason && reasonHandlers[reason]) {
+        reasonHandlers[reason]();
+    } else {
+        console.log(chalk.red(`❌ Unknown disconnect reason: ${reason}`));
+        setTimeout(startNazeBot, 5000);
+    }
+}
+
+// ==============================
+// 📞 PHONE NUMBER HANDLING
+// ==============================
+
+async function getPhoneNumberForPairing() {
+    return new Promise(async (resolve) => {
+        // Coba dapatkan dari environment variable atau global setting
+        phoneNumber = global.number_bot || process.env.BOT_NUMBER || global.phoneNumber;
+        
+        if (!phoneNumber) {
+            console.log(chalk.yellow('📱 Masukkan nomor WhatsApp untuk pairing:'));
+            console.log(chalk.cyan('   Format: 62xxx (tanpa +)'));
+            console.log(chalk.cyan('   Contoh: 6281234567890'));
+            
+            phoneNumber = await question(chalk.green('➡️  Nomor WhatsApp: '));
+        }
+
+        // Format nomor telepon
+        phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
+        
+        // Auto-correct format
+        if (phoneNumber.startsWith('0')) {
+            phoneNumber = '62' + phoneNumber.substring(1);
+        } else if (!phoneNumber.startsWith('62')) {
+            phoneNumber = '62' + phoneNumber;
+        }
+
+        // Validasi nomor
+        const pn = parsePhoneNumber('+' + phoneNumber);
+        if (!pn.isValid()) {
+            console.log(chalk.red('❌ Format nomor tidak valid!'));
+            console.log(chalk.yellow('💡 Contoh format yang benar: 6281234567890'));
+            return getPhoneNumberForPairing();
+        }
+
+        global.phoneNumber = phoneNumber;
+        console.log(chalk.green('✅ Nomor WhatsApp diterima:'), phoneNumber);
+        
+        if (global.setPhoneNumber) {
+            global.setPhoneNumber(phoneNumber);
+        }
+        if (global.setConnectionStatus) {
+            global.setConnectionStatus('waiting_pairing', 'Phone number verified - generating pairing code');
+        }
+
+        resolve(phoneNumber);
+    });
+}
+
+// ==============================
 // 🤖 WHATSAPP BOT IMPLEMENTATION - FIXED PAIRING
 // ==============================
 
@@ -110,9 +236,30 @@ async function startNazeBot() {
             browser: Browsers.ubuntu('Chrome'),
             markOnlineOnConnect: true,
             generateHighQualityLinkPreview: true,
-            syncFullHistory: false,
-            defaultQueryTimeoutMs: 60000,
+            syncFullHistory: true,
+            maxMsgRetryCount: 15,
+            msgRetryCounterCache,
+            defaultQueryTimeoutMs: 0,
             connectTimeoutMs: 60000,
+            transactionOpts: {
+                maxCommitRetries: 10,
+                delayBetweenTriesMs: 10,
+            },
+            appStateMacVerification: {
+                patch: true,
+                snapshot: true,
+            },
+            getMessage: async (key) => {
+                if (store) {
+                    const msg = await store.loadMessage(key.remoteJid, key.id);
+                    return msg?.message || null;
+                }
+                return null;
+            },
+            shouldSyncHistoryMessage: (msg) => {
+                console.log(chalk.green(`Memuat Chat [${msg.progress || 0}%]`));
+                return !!msg.syncType;
+            }
         };
 
         const naze = makeWASocket(socketConfig);
@@ -126,7 +273,7 @@ async function startNazeBot() {
         naze.ev.on('creds.update', saveCreds);
 
         naze.ev.on('connection.update', async (update) => {
-            const { connection, lastDisconnect, qr, isNewLogin } = update;
+            const { connection, lastDisconnect, qr, isNewLogin, receivedPendingNotifications } = update;
 
             console.log(chalk.cyan('🔗 Connection Update:'), connection, qr ? 'QR Received' : '');
 
@@ -242,17 +389,129 @@ async function startNazeBot() {
                 }
 
                 console.log(chalk.green(`🤖 Bot connected as: ${global.botInfo.name}`));
+                
+                // Handle newsletter follow jika ada
+                if (global.db?.set[global.botInfo.id] && !global.db?.set[global.botInfo.id]?.join) {
+                    if (global.my?.ch && global.my.ch.length > 0 && global.my.ch.includes('@newsletter')) {
+                        try {
+                            await naze.newsletterMsg(global.my.ch, { type: 'follow' });
+                            global.db.set[global.botInfo.id].join = true;
+                        } catch (e) {
+                            console.log(chalk.yellow('⚠️ Newsletter follow failed:'), e.message);
+                        }
+                    }
+                }
             }
 
             if (isNewLogin) {
                 console.log(chalk.green('🆕 New login detected'));
             }
+
+            if (receivedPendingNotifications) {
+                console.log(chalk.yellow('⏳ Flushing pending notifications...'));
+                naze.ev.flush();
+            }
         });
+
+        // ==============================
+        // 📨 MESSAGE & EVENT HANDLERS
+        // ==============================
 
         // Bind store jika ada
         if (store.bind) {
             store.bind(naze.ev);
         }
+
+        // Contacts update handler
+        naze.ev.on('contacts.update', (update) => {
+            for (let contact of update) {
+                let trueJid;
+                if (!contact.id) continue;
+                
+                if (contact.id.endsWith('@lid')) {
+                    trueJid = naze.findJidByLid ? naze.findJidByLid(contact.id, store) : contact.id;
+                } else {
+                    trueJid = jidNormalizedUser(contact.id);
+                }
+                
+                if (store.contacts) {
+                    store.contacts[trueJid] = {
+                        ...store.contacts[trueJid],
+                        id: trueJid,
+                        name: contact.notify
+                    };
+                    
+                    if (contact.id.endsWith('@lid')) {
+                        store.contacts[trueJid].lid = jidNormalizedUser(contact.id);
+                    }
+                }
+            }
+        });
+
+        // Call handler
+        naze.ev.on('call', async (call) => {
+            const botNumber = global.botInfo?.id;
+            if (global.db?.set[botNumber]?.anticall) {
+                for (let id of call) {
+                    if (id.status === 'offer') {
+                        try {
+                            const msg = await naze.sendMessage(id.from, { 
+                                text: `Saat Ini, Kami Tidak Dapat Menerima Panggilan ${id.isVideo ? 'Video' : 'Suara'}.\nJika @${id.from.split('@')[0]} Memerlukan Bantuan, Silakan Hubungi Owner :)`, 
+                                mentions: [id.from]
+                            });
+                            
+                            if (global.owner) {
+                                await naze.sendContact(id.from, global.owner, msg);
+                            }
+                            
+                            await naze.rejectCall(id.id, id.from);
+                        } catch (error) {
+                            console.log(chalk.red('❌ Call rejection failed:'), error.message);
+                        }
+                    }
+                }
+            }
+        });
+
+        // Messages upsert handler
+        naze.ev.on('messages.upsert', async (message) => {
+            // Import dan panggil handler messages
+            try {
+                const { MessagesUpsert } = require('./handler/messages');
+                await MessagesUpsert(naze, message, store);
+            } catch (error) {
+                console.log(chalk.yellow('⚠️ Messages handler not available'));
+            }
+        });
+
+        // Group participants update handler
+        naze.ev.on('group-participants.update', async (update) => {
+            try {
+                const { GroupParticipantsUpdate } = require('./handler/group');
+                await GroupParticipantsUpdate(naze, update, store);
+            } catch (error) {
+                console.log(chalk.yellow('⚠️ Group handler not available'));
+            }
+        });
+
+        // Groups update handler
+        naze.ev.on('groups.update', (update) => {
+            for (const n of update) {
+                if (store.groupMetadata && store.groupMetadata[n.id]) {
+                    Object.assign(store.groupMetadata[n.id], n);
+                } else if (store.groupMetadata) {
+                    store.groupMetadata[n.id] = n;
+                }
+            }
+        });
+
+        // Presence update handler
+        naze.ev.on('presence.update', ({ id, presences: update }) => {
+            if (store.presences) {
+                store.presences[id] = store.presences?.[id] || {};
+                Object.assign(store.presences[id], update);
+            }
+        });
 
         // Keep alive
         setInterval(async () => {
@@ -266,107 +525,6 @@ async function startNazeBot() {
     } catch (error) {
         console.error(chalk.red('❌ Bot initialization failed:'), error);
         throw error;
-    }
-}
-
-// ==============================
-// 📞 PHONE NUMBER HANDLING
-// ==============================
-
-async function getPhoneNumberForPairing() {
-    return new Promise(async (resolve) => {
-        // Coba dapatkan dari environment variable atau global setting
-        phoneNumber = global.number_bot || process.env.BOT_NUMBER || global.phoneNumber;
-        
-        if (!phoneNumber) {
-            console.log(chalk.yellow('📱 Masukkan nomor WhatsApp untuk pairing:'));
-            console.log(chalk.cyan('   Format: 62xxx (tanpa +)'));
-            console.log(chalk.cyan('   Contoh: 6281234567890'));
-            
-            phoneNumber = await question(chalk.green('➡️  Nomor WhatsApp: '));
-        }
-
-        // Format nomor telepon
-        phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
-        
-        // Auto-correct format
-        if (phoneNumber.startsWith('0')) {
-            phoneNumber = '62' + phoneNumber.substring(1);
-        } else if (!phoneNumber.startsWith('62')) {
-            phoneNumber = '62' + phoneNumber;
-        }
-
-        // Validasi nomor
-        const pn = parsePhoneNumber('+' + phoneNumber);
-        if (!pn.isValid()) {
-            console.log(chalk.red('❌ Format nomor tidak valid!'));
-            console.log(chalk.yellow('💡 Contoh format yang benar: 6281234567890'));
-            return getPhoneNumberForPairing();
-        }
-
-        global.phoneNumber = phoneNumber;
-        console.log(chalk.green('✅ Nomor WhatsApp diterima:'), phoneNumber);
-        
-        if (global.setPhoneNumber) {
-            global.setPhoneNumber(phoneNumber);
-        }
-        if (global.setConnectionStatus) {
-            global.setConnectionStatus('waiting_pairing', 'Phone number verified - generating pairing code');
-        }
-
-        resolve(phoneNumber);
-    });
-}
-
-// ==============================
-// 🔧 UTILITY FUNCTIONS
-// ==============================
-
-function getStatusMessage(connection) {
-    const statusMap = {
-        'connecting': 'Menghubungkan ke WhatsApp...',
-        'open': 'Terhubung ke WhatsApp',
-        'close': 'Koneksi terputus',
-        'offline': 'Offline',
-        'pairing': 'Pairing code tersedia - masukkan di WhatsApp',
-        'waiting_pairing': 'Menunggu pembuatan pairing code'
-    };
-    return statusMap[connection] || connection;
-}
-
-function handleDisconnect(reason, naze) {
-    console.log(chalk.yellow('🔄 Handling disconnect...'));
-    
-    const reasonHandlers = {
-        [DisconnectReason.connectionLost]: () => {
-            console.log('🔌 Koneksi terputus, mencoba kembali...');
-            setTimeout(startNazeBot, 5000);
-        },
-        [DisconnectReason.connectionClosed]: () => {
-            console.log('🔌 Koneksi ditutup, mencoba kembali...');
-            setTimeout(startNazeBot, 5000);
-        },
-        [DisconnectReason.restartRequired]: () => {
-            console.log('🔄 Restart diperlukan...');
-            setTimeout(startNazeBot, 5000);
-        },
-        [DisconnectReason.timedOut]: () => {
-            console.log('⏰ Timeout, mencoba kembali...');
-            setTimeout(startNazeBot, 5000);
-        },
-        [DisconnectReason.loggedOut]: () => {
-            console.log('🚪 Logged out, menghapus session...');
-            exec('rm -rf ./nazedev/*', () => {
-                setTimeout(startNazeBot, 3000);
-            });
-        },
-    };
-
-    if (reason && reasonHandlers[reason]) {
-        reasonHandlers[reason]();
-    } else {
-        console.log(chalk.red(`❌ Unknown disconnect reason: ${reason}`));
-        setTimeout(startNazeBot, 5000);
     }
 }
 
