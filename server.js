@@ -27,6 +27,9 @@ const app = express();
 let server = null;
 let CURRENT_PORT = KOYEB_PORT;
 let isServerRunning = false;
+let retryCount = 0;
+const MAX_RETRIES = 5;
+const RETRY_DELAY = 3000;
 
 // Koyeb Deployment Banner HTML
 const deploymentBanner = `
@@ -396,6 +399,17 @@ const htmlContent = `<!DOCTYPE html>
             align-items: center;
             gap: 5px;
         }
+        .retry-badge {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
     </style>
 </head>
 <body>
@@ -419,6 +433,9 @@ const htmlContent = `<!DOCTYPE html>
                         </span>
                         <span class="auto-start-badge ms-2">
                             <i class="fas fa-bolt me-1"></i>Auto Start
+                        </span>
+                        <span class="retry-badge ms-2" id="retryBadge" style="display: none;">
+                            <i class="fas fa-redo me-1"></i>Retrying...
                         </span>
                     </h1>
                     <p class="lead text-muted mb-3">WhatsApp Bot successfully deployed on Koyeb Cloud</p>
@@ -447,6 +464,7 @@ const htmlContent = `<!DOCTYPE html>
                 <span class="badge bg-success">Auto Deploy</span>
                 <span class="badge bg-info">Cloud Optimized</span>
                 <span class="badge bg-warning">Auto Restart</span>
+                <span class="badge bg-danger" id="retryCounter" style="display: none;">Retry: 0/5</span>
             </div>
         </div>
 
@@ -599,13 +617,15 @@ const htmlContent = `<!DOCTYPE html>
             POLLING_INTERVAL_ACTIVE: 1500,
             POLLING_INTERVAL_ONLINE: 3000,
             PAIRING_CODE_TIMEOUT: 30,
-            MAX_RETRIES: 3,
-            AUTO_START_DELAY: 3000
+            MAX_RETRIES: 5,
+            AUTO_START_DELAY: 3000,
+            RETRY_DELAY: 3000
         };
 
         let pollingInterval = CONFIG.POLLING_INTERVAL_NORMAL;
         let currentStatus = 'initializing';
         let isFirstLoad = true;
+        let connectionRetries = 0;
 
         // Koyeb initialization
         document.addEventListener('DOMContentLoaded', function() {
@@ -627,7 +647,7 @@ const htmlContent = `<!DOCTYPE html>
             }, 1000);
         });
 
-        // Enhanced status polling for Koyeb
+        // Enhanced status polling for Koyeb with retry mechanism
         function updateStatus() {
             fetch('/api/status')
                 .then(response => {
@@ -636,11 +656,53 @@ const htmlContent = `<!DOCTYPE html>
                 })
                 .then(data => {
                     processKoyebStatusUpdate(data);
+                    // Reset retry counter on successful connection
+                    if (data.connection_status === 'online') {
+                        connectionRetries = 0;
+                        hideRetryIndicator();
+                    }
                 })
                 .catch(error => {
                     console.error('Koyeb status update error:', error);
-                    showNotification('Koyeb connection issue, retrying...', 'warning');
+                    handleConnectionError();
                 });
+        }
+
+        function handleConnectionError() {
+            connectionRetries++;
+            
+            if (connectionRetries <= CONFIG.MAX_RETRIES) {
+                showRetryIndicator();
+                showNotification(`Koyeb connection issue, retrying... (${connectionRetries}/${CONFIG.MAX_RETRIES})`, 'warning', 3000);
+                
+                // Exponential backoff
+                const backoffDelay = CONFIG.RETRY_DELAY * Math.pow(1.5, connectionRetries - 1);
+                setTimeout(() => {
+                    updateStatus();
+                }, backoffDelay);
+            } else {
+                showNotification('❌ Koyeb connection failed after multiple retries. Please check your deployment.', 'danger', 10000);
+                hideRetryIndicator();
+            }
+        }
+
+        function showRetryIndicator() {
+            const retryBadge = document.getElementById('retryBadge');
+            const retryCounter = document.getElementById('retryCounter');
+            
+            if (retryBadge) retryBadge.style.display = 'inline-flex';
+            if (retryCounter) {
+                retryCounter.style.display = 'inline-flex';
+                retryCounter.textContent = `Retry: ${connectionRetries}/${CONFIG.MAX_RETRIES}`;
+            }
+        }
+
+        function hideRetryIndicator() {
+            const retryBadge = document.getElementById('retryBadge');
+            const retryCounter = document.getElementById('retryCounter');
+            
+            if (retryBadge) retryBadge.style.display = 'none';
+            if (retryCounter) retryCounter.style.display = 'none';
         }
 
         function processKoyebStatusUpdate(data) {
@@ -1108,7 +1170,7 @@ function getRateLimitInfo() {
     return koyebRateLimit.pairingRateLimit;
 }
 
-// Koyeb server startup dengan deployment banner
+// Koyeb server startup dengan deployment banner dan retry mechanism
 async function startServer() {
     if (isServerRunning) return CURRENT_PORT;
 
@@ -1143,6 +1205,7 @@ async function startServer() {
                 
                 isServerRunning = true;
                 global.webUptime = Date.now();
+                retryCount = 0; // Reset retry count on successful start
                 resolve(CURRENT_PORT);
             });
 
@@ -1153,13 +1216,34 @@ async function startServer() {
                     startServer().then(resolve).catch(reject);
                 } else {
                     console.log(chalk.red('❌ Koyeb server error:'), err);
-                    reject(err);
+                    
+                    // Retry mechanism for other errors
+                    if (retryCount < MAX_RETRIES) {
+                        retryCount++;
+                        console.log(chalk.yellow(`🔄 Koyeb retrying server start... (${retryCount}/${MAX_RETRIES})`));
+                        setTimeout(() => {
+                            startServer().then(resolve).catch(reject);
+                        }, RETRY_DELAY * retryCount);
+                    } else {
+                        console.log(chalk.red(`❌ Koyeb failed to start server after ${MAX_RETRIES} retries`));
+                        reject(err);
+                    }
                 }
             });
         });
     } catch (error) {
         console.error('❌ Koyeb failed to start server:', error);
-        throw error;
+        
+        // Retry mechanism for promise rejections
+        if (retryCount < MAX_RETRIES) {
+            retryCount++;
+            console.log(chalk.yellow(`🔄 Koyeb retrying server start... (${retryCount}/${MAX_RETRIES})`));
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * retryCount));
+            return startServer();
+        } else {
+            console.log(chalk.red(`❌ Koyeb failed to start server after ${MAX_RETRIES} retries`));
+            throw error;
+        }
     }
 }
 
@@ -1169,6 +1253,17 @@ process.on('SIGINT', () => {
     if (server) {
         server.close();
     }
+});
+
+// Enhanced error handling for uncaught exceptions
+process.on('uncaughtException', (error) => {
+    console.log(chalk.red('🚨 Koyeb uncaught exception:'), error);
+    // Don't exit the process, let Koyeb handle the restart
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.log(chalk.red('🚨 Koyeb unhandled rejection at:'), promise, 'reason:', reason);
+    // Don't exit the process, let Koyeb handle the restart
 });
 
 module.exports = { 
