@@ -192,32 +192,10 @@ const store = {
     }
 };
 
-// Enhanced fetchApi dengan headers anti-detection
 global.fetchApi = async (path = '/', query = {}, options) => {
     try {
         const urlnya = (options?.name || options ? ((options?.name || options) in global.APIs ? global.APIs[(options?.name || options)] : (options?.name || options)) : global.APIs['hitori'] ? global.APIs['hitori'] : (options?.name || options)) + path + (query ? '?' + decodeURIComponent(new URLSearchParams(Object.entries({ ...query }))) : '');
-        
-        const headers = {
-            'accept': 'application/json, text/plain, */*',
-            'accept-language': 'en-US,en;q=0.9,id;q=0.8',
-            'sec-ch-ua': '"Google Chrome";v="119", "Chromium";v="119", "Not?A_Brand";v="24"',
-            'sec-ch-ua-mobile': '?0',
-            'sec-ch-ua-platform': '"Windows"',
-            'sec-fetch-dest': 'empty',
-            'sec-fetch-mode': 'cors',
-            'sec-fetch-site': 'same-site',
-            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-            'x-api-key': global.APIKeys[global.APIs['hitori']] || '',
-            ...((options?.name || options) ? {} : { 
-                'accept': 'application/json',
-                'x-api-key': global.APIKeys[global.APIs['hitori']]
-            })
-        };
-
-        const { data } = await axios.get(urlnya, { 
-            headers,
-            timeout: 10000
-        });
+        const { data } = await axios.get(urlnya, { ...((options?.name || options) ? {} : { headers: { 'accept': 'application/json', 'x-api-key': global.APIKeys[global.APIs['hitori']]}})});
         return data;
     } catch (error) {
         console.error('❌ API fetch error:', error.message);
@@ -547,48 +525,29 @@ async function startNazeBot() {
             });
         }
         
-        const { SocksProxyAgent } = require('socks-proxy-agent');
-
-// Konfigurasi TOR Proxy (default TOR SOCKS5 port 9050)
-const torProxy = new SocksProxyAgent('socks5://127.0.0.1:9050');
-
-const naze = makeWASocket({
-    version,
-    logger,
-    printQRInTerminal: !pairingCode,
-    auth: {
-        creds: state.creds,
-        keys: makeCacheableSignalKeyStore(state.keys, logger),
-    },
-    markOnlineOnConnect: true,
-    generateHighQualityLinkPreview: true,
-    getMessage,
-    retryRequestDelayMs: 2000,
-    maxRetries: 5,
-    connectTimeoutMs: 45000,
-    keepAliveIntervalMs: 20000,
-    emitOwnEvents: true,
-    defaultQueryTimeoutMs: 60000,
-    syncFullHistory: false,
-    fireInitQueries: true,
-    authTimeoutMs: 30000,
-    logger: pino({ level: 'silent' }),
-    
-    // 🔒 Konfigurasi untuk TOR Browser
-    browser: ['Tor Browser', 'Firefox', '102.0'],
-    
-    // 🌐 Konfigurasi proxy TOR
-    fetchAgent: torProxy,
-    
-    // ⚡ Tambahan konfigurasi untuk kompatibilitas TOR
-    patchMessageBeforeSending: (message) => {
-        // Optimalkan untuk koneksi TOR yang lebih lambat
-        if (message.imageMessage || message.videoMessage) {
-            message.uploadMediaDelayMs = 10000; // Tambah delay upload
-        }
-        return message;
-    }
-});
+        const naze = makeWASocket({
+            version,
+            logger,
+            printQRInTerminal: !pairingCode,
+            auth: {
+                creds: state.creds,
+                keys: makeCacheableSignalKeyStore(state.keys, logger),
+            },
+            markOnlineOnConnect: true,
+            generateHighQualityLinkPreview: true,
+            getMessage,
+            retryRequestDelayMs: 2000,
+            maxRetries: 5,
+            connectTimeoutMs: 45000,
+            keepAliveIntervalMs: 20000,
+            emitOwnEvents: true,
+            defaultQueryTimeoutMs: 60000,
+            syncFullHistory: false,
+            fireInitQueries: true,
+            authTimeoutMs: 30000,
+            logger: pino({ level: 'silent' }),
+            browser: ['Ubuntu', 'Firefox', '102.0']
+        });
         
         store.bind(naze.ev);
         
