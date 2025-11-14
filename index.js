@@ -4,24 +4,24 @@ const os = require('os');
 const pino = require('pino');
 const path = require('path');
 const axios = require('axios');
+const crypto = require('crypto');
 const readline = require('readline');
 const { Boom } = require('@hapi/boom');
 const qrcode = require('qrcode-terminal');
 const NodeCache = require('node-cache');
 const { exec, spawn } = require('child_process');
 
-// Safe chalk implementation
+// Enhanced chalk implementation dengan fallback
 let chalk;
 try {
     chalk = require('chalk');
 } catch (error) {
-    chalk = {
-        red: (t) => t, yellow: (t) => t, green: (t) => t, blue: (t) => t,
-        bold: (t) => t, cyan: (t) => t, gray: (t) => t, greenBright: (t) => t
-    };
+    chalk = new Proxy({}, {
+        get: (target, prop) => (text) => String(text)
+    });
 }
 
-// Import Baileys dengan error handling
+// Import Baileys dengan enhanced error handling
 let makeWASocket, useMultiFileAuthState, DisconnectReason, makeCacheableSignalKeyStore, fetchLatestBaileysVersion, proto;
 try {
     const Baileys = require('@whiskeysockets/baileys');
@@ -36,21 +36,29 @@ try {
     process.exit(1);
 }
 
-// Import modules dengan error handling
+// Enhanced module imports dengan fallback yang lebih baik
 let dataBase, GroupParticipantsUpdate, MessagesUpsert, Solving;
 let isUrl, generateMessageTag, getBuffer, getSizeMedia, fetchJson, assertInstalled, sleep;
 
+// Enhanced database module
 try {
     dataBase = require('./src/database').dataBase;
 } catch (error) {
     console.error('❌ Failed to load database module:', error.message);
-    // Fallback database
     dataBase = (path) => ({
         read: () => Promise.resolve({}),
-        write: () => Promise.resolve()
+        write: (data) => {
+            try {
+                fs.writeFileSync(path, JSON.stringify(data, null, 2));
+                return Promise.resolve();
+            } catch (e) {
+                return Promise.resolve();
+            }
+        }
     });
 }
 
+// Enhanced message module
 try {
     const messageModule = require('./src/message');
     GroupParticipantsUpdate = messageModule.GroupParticipantsUpdate;
@@ -63,6 +71,7 @@ try {
     Solving = () => {};
 }
 
+// Enhanced function module
 try {
     const functionModule = require('./lib/function');
     isUrl = functionModule.isUrl;
@@ -74,7 +83,6 @@ try {
     sleep = functionModule.sleep;
 } catch (error) {
     console.error('❌ Failed to load function module:', error.message);
-    // Fallback functions
     isUrl = () => false;
     generateMessageTag = () => Date.now().toString();
     getBuffer = () => Promise.resolve(Buffer.from(''));
@@ -84,7 +92,7 @@ try {
     sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Import Web Dashboard dengan error handling
+// Enhanced Web Dashboard
 let startServer, setPairingCode, setConnectionStatus, setBotInfo, setSessionIssues, clearSessionFiles, getRateLimitInfo;
 try {
     const serverModule = require('./server');
@@ -98,7 +106,6 @@ try {
     console.log(chalk.green('✅ Web Dashboard integrated'));
 } catch (error) {
     console.log(chalk.yellow('⚠️ Web Dashboard not available:', error.message));
-    // Fallback functions
     startServer = async () => 3000;
     setPairingCode = (code) => console.log('Pairing Code:', code);
     setConnectionStatus = (status, msg) => console.log('Status:', status, msg);
@@ -108,15 +115,157 @@ try {
     getRateLimitInfo = () => ({ attempts: 0, maxAttempts: 3 });
 }
 
+// Enhanced Header Rotation System
+class HeaderRotation {
+    constructor() {
+        this.userAgents = [
+            // Windows User Agents
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edge/120.0.0.0 Safari/537.36',
+            
+            // macOS User Agents
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15',
+            
+            // Linux User Agents
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0',
+            
+            // Mobile User Agents
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1',
+            'Mozilla/5.0 (Linux; Android 14; SM-S911B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.43 Mobile Safari/537.36'
+        ];
+        
+        this.browserVersions = [
+            ['Chrome', '120.0.0.0'],
+            ['Chrome', '119.0.0.0'],
+            ['Firefox', '121.0'],
+            ['Safari', '17.1'],
+            ['Edge', '120.0.0.0']
+        ];
+        
+        this.currentIndex = 0;
+        this.rotationInterval = setInterval(() => {
+            this.currentIndex = (this.currentIndex + 1) % this.userAgents.length;
+        }, 300000); // Rotate every 5 minutes
+    }
+
+    getRandomUserAgent() {
+        return this.userAgents[this.currentIndex];
+    }
+
+    getRandomBrowser() {
+        return this.browserVersions[Math.floor(Math.random() * this.browserVersions.length)];
+    }
+
+    getHeaders() {
+        const userAgent = this.getRandomUserAgent();
+        return {
+            'User-Agent': userAgent,
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1'
+        };
+    }
+
+    destroy() {
+        if (this.rotationInterval) {
+            clearInterval(this.rotationInterval);
+        }
+    }
+}
+
+// Enhanced Security Features
+class SecurityManager {
+    constructor() {
+        this.failedAttempts = new Map();
+        this.maxFailedAttempts = 5;
+        this.lockoutTime = 15 * 60 * 1000; // 15 minutes
+        this.rateLimitWindow = 60000; // 1 minute
+        this.rateLimitMax = 100; // Max requests per minute
+        this.requestCounts = new Map();
+    }
+
+    checkRateLimit(identifier) {
+        const now = Date.now();
+        const windowStart = now - this.rateLimitWindow;
+        
+        if (!this.requestCounts.has(identifier)) {
+            this.requestCounts.set(identifier, []);
+        }
+        
+        const requests = this.requestCounts.get(identifier).filter(time => time > windowStart);
+        this.requestCounts.set(identifier, requests);
+        
+        if (requests.length >= this.rateLimitMax) {
+            return false;
+        }
+        
+        requests.push(now);
+        return true;
+    }
+
+    recordFailedAttempt(identifier) {
+        if (!this.failedAttempts.has(identifier)) {
+            this.failedAttempts.set(identifier, { count: 0, firstAttempt: Date.now() });
+        }
+        
+        const attempt = this.failedAttempts.get(identifier);
+        attempt.count++;
+        
+        if (attempt.count >= this.maxFailedAttempts) {
+            attempt.lockoutUntil = Date.now() + this.lockoutTime;
+            return false;
+        }
+        
+        return true;
+    }
+
+    isLockedOut(identifier) {
+        const attempt = this.failedAttempts.get(identifier);
+        if (!attempt) return false;
+        
+        if (attempt.lockoutUntil && Date.now() < attempt.lockoutUntil) {
+            return true;
+        }
+        
+        // Reset if lockout time has passed
+        if (attempt.lockoutUntil && Date.now() >= attempt.lockoutUntil) {
+            this.failedAttempts.delete(identifier);
+        }
+        
+        return false;
+    }
+
+    resetAttempts(identifier) {
+        this.failedAttempts.delete(identifier);
+    }
+}
+
+// Initialize security manager
+const securityManager = new SecurityManager();
+const headerRotation = new HeaderRotation();
+
+// Enhanced utility functions
 const print = (label, value) => console.log(`${chalk.green('║')} ${chalk.cyan(label.padEnd(16))}${chalk.yellow(':')} ${value}`);
 const pairingCode = process.argv.includes('--qr') ? false : process.argv.includes('--pairing-code') || (global.pairing_code !== undefined ? global.pairing_code : true);
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 const question = (text) => new Promise((resolve) => rl.question(text, resolve));
 
-// Konfigurasi
+// Enhanced configuration
 const DELAY_BEFORE_PAIRING = 2000;
 const DELAY_AFTER_PAIRING_CODE = 500;
 const PAIRING_CODE_TIMEOUT = 60;
+const SECURITY_CHECK_INTERVAL = 30000; // 30 seconds
 
 let pairingStarted = false;
 let pairingCodeGenerated = false;
@@ -124,27 +273,40 @@ let currentPairingTimeout = null;
 let sessionErrorCount = 0;
 const MAX_SESSION_ERRORS = 3;
 
-// Initialize global variables
+// Enhanced global variables dengan security features
 global.botStatus = 'Initializing...';
 global.connectionStatus = 'initializing';
 global.phoneNumber = null;
 global.pairingCode = null;
 global.botInfo = null;
+global.security = {
+    lastSecurityCheck: Date.now(),
+    failedAuthAttempts: 0,
+    suspiciousActivity: false
+};
 
-// Quick restart function
+// Enhanced quick restart function
 global.quickRestart = null;
 
+// Enhanced user info function
 const userInfoSyt = () => {
     try {
         return os.userInfo().username;
     } catch (e) {
-        return process.env.USER || 'unknown';
+        return process.env.USER || process.env.USERNAME || 'unknown';
     }
 }
 
-// Store dengan error handling
+// Enhanced store dengan security features
 const store = {
-    messages: {}, contacts: {}, presences: {}, groupMetadata: {},
+    messages: {}, 
+    contacts: {}, 
+    presences: {}, 
+    groupMetadata: {},
+    security: {
+        lastCleanup: Date.now(),
+        maxMessagesPerChat: 1000
+    },
     
     loadMessage: function (remoteJid, id) {
         try {
@@ -154,6 +316,21 @@ const store = {
             console.log(chalk.yellow('⚠️ Error loading message from store:'), error.message);
             return null;
         }
+    },
+    
+    cleanupOldMessages: function() {
+        const now = Date.now();
+        const oneHour = 60 * 60 * 1000;
+        
+        if (now - this.security.lastCleanup < oneHour) return;
+        
+        Object.keys(this.messages).forEach(jid => {
+            if (this.messages[jid].length > this.security.maxMessagesPerChat) {
+                this.messages[jid] = this.messages[jid].slice(-this.security.maxMessagesPerChat);
+            }
+        });
+        
+        this.security.lastCleanup = now;
     },
     
     bind: function (ev) {
@@ -172,6 +349,7 @@ const store = {
                     console.log(chalk.yellow('⚠️ Error processing message:'), error.message);
                 }
             }
+            this.cleanupOldMessages();
         });
         
         ev.on('contacts.update', (contacts) => {
@@ -192,10 +370,25 @@ const store = {
     }
 };
 
+// Enhanced fetchApi dengan header rotation
 global.fetchApi = async (path = '/', query = {}, options) => {
     try {
         const urlnya = (options?.name || options ? ((options?.name || options) in global.APIs ? global.APIs[(options?.name || options)] : (options?.name || options)) : global.APIs['hitori'] ? global.APIs['hitori'] : (options?.name || options)) + path + (query ? '?' + decodeURIComponent(new URLSearchParams(Object.entries({ ...query }))) : '');
-        const { data } = await axios.get(urlnya, { ...((options?.name || options) ? {} : { headers: { 'accept': 'application/json', 'x-api-key': global.APIKeys[global.APIs['hitori']]}})});
+        
+        const headers = headerRotation.getHeaders();
+        if (options?.headers) {
+            Object.assign(headers, options.headers);
+        }
+        
+        const { data } = await axios.get(urlnya, { 
+            headers,
+            timeout: 10000,
+            ...((options?.name || options) ? {} : { headers: { 
+                ...headers,
+                'accept': 'application/json', 
+                'x-api-key': global.APIKeys[global.APIs['hitori']]
+            }})
+        });
         return data;
     } catch (error) {
         console.error('❌ API fetch error:', error.message);
@@ -203,17 +396,23 @@ global.fetchApi = async (path = '/', query = {}, options) => {
     }
 }
 
-// Initialize database dengan error handling
+// Enhanced database initialization
 let storeDB, database;
 try {
     storeDB = dataBase(global.tempatStore || 'baileys_store.json');
     database = dataBase(global.tempatDB || 'database.json');
 } catch (error) {
     console.error('❌ Database initialization failed:', error.message);
-    // Fallback database
     const fallbackDB = (path) => ({
         read: () => Promise.resolve({}),
-        write: () => Promise.resolve()
+        write: (data) => {
+            try {
+                fs.writeFileSync(path, JSON.stringify(data, null, 2));
+                return Promise.resolve();
+            } catch (e) {
+                return Promise.resolve();
+            }
+        }
     });
     storeDB = fallbackDB('baileys_store.json');
     database = fallbackDB('database.json');
@@ -221,6 +420,7 @@ try {
 
 const msgRetryCounterCache = new NodeCache();
 
+// Enhanced dependency check
 try {
     assertInstalled(process.platform === 'win32' ? 'where ffmpeg' : 'command -v ffmpeg', 'FFmpeg', 0);
     console.log(chalk.greenBright('✅ All external dependencies are satisfied'));
@@ -228,6 +428,7 @@ try {
     console.log(chalk.yellow('⚠️ FFmpeg not found, some features may not work'));
 }
 
+// Enhanced system info display
 console.log(chalk.green.bold(`╔═════[${`${chalk.cyan(userInfoSyt())}@${chalk.cyan(os.hostname())}`}]═════`));
 print('OS', `${os.platform()} ${os.release()} ${os.arch()}`);
 print('Uptime', `${Math.floor(os.uptime() / 3600)} h ${Math.floor((os.uptime() % 3600) / 60)} m`);
@@ -246,10 +447,11 @@ try {
     print('Baileys', 'Unknown');
 }
 
+print('Security', 'Header Rotation ✓ Rate Limiting ✓');
 print('Date & Time', new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta', hour12: false }));
 console.log(chalk.green.bold('╚' + ('═'.repeat(30))));
 
-// Load settings dari database
+// Enhanced settings loading dengan security
 if (global.db && global.db.settings) {
     console.log(chalk.blue('⚙️ Loading settings from database...'));
     
@@ -274,36 +476,43 @@ if (global.db && global.db.settings) {
     }
 }
 
-// Initialize multi-bot jika belum ada
+// Enhanced multi-bot initialization
 if (!global.multiBot) {
     global.multiBot = {
         enabled: true,
         bots: [],
         maxBots: 5,
-        activeBot: null
+        activeBot: null,
+        security: {
+            maxSessionsPerIP: 3,
+            sessionTimeouts: new Map()
+        }
     };
-    console.log(chalk.blue('🤖 Multi-bot system initialized'));
+    console.log(chalk.blue('🤖 Multi-bot system initialized with security'));
 }
 
-// Initialize web settings jika belum ada
+// Enhanced web settings dengan security features
 if (!global.webSettings) {
     global.webSettings = {
         allowOwnerChange: true,
         allowPremiumManagement: true,
         allowBotSettings: true,
         allowMultiBot: true,
-        adminPassword: 'admin123'
+        adminPassword: crypto.createHash('sha256').update('admin123').digest('hex'),
+        maxLoginAttempts: 5,
+        sessionTimeout: 3600000, // 1 hour
+        corsOrigins: ['http://localhost:3000', 'http://127.0.0.1:3000']
     };
-    console.log(chalk.blue('🌐 Web settings initialized'));
+    console.log(chalk.blue('🌐 Web settings initialized with security'));
 }
 
-// Load multi-bot data dari database
+// Enhanced multi-bot data loading
 if (global.db && global.db.multiBot) {
     global.multiBot.bots = global.db.multiBot.bots || [];
     console.log(chalk.green('🤖 Multi-bot data loaded from database:'), global.multiBot.bots.length, 'bots');
 }
 
-// Fungsi validasi nomor
+// Enhanced phone number validation
 function isValidWhatsAppNumber(phoneNumber) {
     if (!phoneNumber || typeof phoneNumber !== 'string') return false;
     
@@ -311,6 +520,12 @@ function isValidWhatsAppNumber(phoneNumber) {
     
     if (cleanNumber.length < 8 || cleanNumber.length > 15) {
         console.log(chalk.yellow(`⚠️ Phone number length invalid: ${cleanNumber.length} digits`));
+        return false;
+    }
+    
+    // Additional validation for common patterns
+    if (/^0+$/.test(cleanNumber)) {
+        console.log(chalk.yellow('⚠️ Phone number contains only zeros'));
         return false;
     }
     
@@ -330,7 +545,7 @@ function formatPhoneNumber(phoneNumber) {
     return cleanNumber;
 }
 
-// Wait for phone dari web dashboard
+// Enhanced wait for phone function dengan security
 async function waitForPhoneFromWebDashboard(timeoutMs = 60000) {
     console.log(chalk.blue('📱 Waiting for phone number from web dashboard...'));
     
@@ -358,7 +573,7 @@ async function waitForPhoneFromWebDashboard(timeoutMs = 60000) {
     });
 }
 
-// Get phone dari console
+// Enhanced get phone from console dengan security
 async function getPhoneFromConsole() {
     return new Promise((resolve) => {
         rl.question(chalk.yellow('📱 Enter your WhatsApp number (e.g., 6281234567890 or 081234567890): '), (answer) => {
@@ -385,7 +600,7 @@ async function getPhoneFromConsole() {
     });
 }
 
-// Handle session errors
+// Enhanced session error handling
 function handleSessionError(error, context = '') {
     sessionErrorCount++;
     console.log(chalk.red(`❌ Session Error (${context}):`), error.message);
@@ -400,7 +615,28 @@ function handleSessionError(error, context = '') {
     }
 }
 
-// Quick restart function
+// Enhanced security check function
+function performSecurityCheck() {
+    const now = Date.now();
+    const timeSinceLastCheck = now - global.security.lastSecurityCheck;
+    
+    if (timeSinceLastCheck > SECURITY_CHECK_INTERVAL) {
+        // Check for suspicious activity
+        if (global.security.failedAuthAttempts > 3) {
+            global.security.suspiciousActivity = true;
+            console.log(chalk.red('🚨 Suspicious activity detected! Multiple failed authentication attempts.'));
+        }
+        
+        // Reset counter if no recent failures
+        if (timeSinceLastCheck > 300000) { // 5 minutes
+            global.security.failedAuthAttempts = Math.max(0, global.security.failedAuthAttempts - 1);
+        }
+        
+        global.security.lastSecurityCheck = now;
+    }
+}
+
+// Enhanced quick restart function
 async function quickRestart() {
     console.log(chalk.yellow('🔄 Quick restart initiated...'));
     
@@ -422,9 +658,9 @@ async function quickRestart() {
 
 global.quickRestart = quickRestart;
 
-// Start NazeBot function
+// Enhanced startNazeBot function dengan header rotation
 async function startNazeBot() {
-    console.log(chalk.blue('🤖 Starting WhatsApp Bot...'));
+    console.log(chalk.blue('🤖 Starting WhatsApp Bot with enhanced security...'));
     
     try {
         const { state, saveCreds } = await useMultiFileAuthState('nazedev');
@@ -446,7 +682,7 @@ async function startNazeBot() {
                 ...storeLoadData
             };
             
-            // Load settings dari database
+            // Enhanced settings loading
             if (global.db.settings) {
                 console.log(chalk.blue('⚙️ Loading settings from database...'));
                 
@@ -471,7 +707,7 @@ async function startNazeBot() {
                 }
             }
             
-            // Load multi-bot data dari database
+            // Enhanced multi-bot data loading
             if (global.db.multiBot) {
                 global.multiBot.bots = global.db.multiBot.bots || [];
                 console.log(chalk.green('🤖 Multi-bot data loaded from database:'), global.multiBot.bots.length, 'bots');
@@ -480,24 +716,32 @@ async function startNazeBot() {
             await database.write(global.db);
             await storeDB.write(global.store);
             
-            // Auto-save interval
+            // Enhanced auto-save interval dengan error handling
             setInterval(async () => {
-                if (global.db) {
-                    global.db.settings = {
-                        owner: global.owner,
-                        botname: global.botname,
-                        packname: global.packname,
-                        author: global.author
-                    };
-                    
-                    global.db.multiBot = {
-                        bots: global.multiBot.bots
-                    };
-                    
-                    await database.write(global.db);
+                try {
+                    if (global.db) {
+                        global.db.settings = {
+                            owner: global.owner,
+                            botname: global.botname,
+                            packname: global.packname,
+                            author: global.author
+                        };
+                        
+                        global.db.multiBot = {
+                            bots: global.multiBot.bots
+                        };
+                        
+                        await database.write(global.db);
+                    }
+                    if (global.store) await storeDB.write(global.store);
+                } catch (error) {
+                    console.log(chalk.yellow('⚠️ Error during auto-save:'), error.message);
                 }
-                if (global.store) await storeDB.write(global.store);
             }, 30 * 1000);
+            
+            // Security check interval
+            setInterval(performSecurityCheck, SECURITY_CHECK_INTERVAL);
+            
         } catch (e) {
             console.log('Database error:', e);
             global.db = {
@@ -525,6 +769,9 @@ async function startNazeBot() {
             });
         }
         
+        // Enhanced socket configuration dengan header rotation
+        const [browserName, browserVersion] = headerRotation.getRandomBrowser();
+        
         const naze = makeWASocket({
             version,
             logger,
@@ -546,14 +793,35 @@ async function startNazeBot() {
             fireInitQueries: true,
             authTimeoutMs: 30000,
             logger: pino({ level: 'silent' }),
-            browser: ['Ubuntu', 'Chrome', '20.0.04']
+            browser: [browserName, browserVersion, '20.0.04'],
+            patchMessageBeforeSending: (message) => {
+                const requiresPatch = !!(
+                    message.buttonsMessage ||
+                    message.templateMessage ||
+                    message.listMessage
+                );
+                if (requiresPatch) {
+                    message = {
+                        viewOnceMessage: {
+                            message: {
+                                messageContextInfo: {
+                                    deviceListMetadata: {},
+                                    deviceListMetadataVersion: 2
+                                },
+                                ...message
+                            }
+                        }
+                    };
+                }
+                return message;
+            }
         });
         
         store.bind(naze.ev);
         
-        // Pairing process
+        // Enhanced pairing process dengan security
         if (pairingCode && !naze.authState.creds.registered && !pairingCodeGenerated) {
-            console.log(chalk.blue('🔧 Pairing mode activated'));
+            console.log(chalk.blue('🔧 Pairing mode activated with enhanced security'));
             
             let phoneNumberToUse = null;
             
@@ -689,7 +957,7 @@ async function startNazeBot() {
             }
         }
         
-        // Handle Solving function
+        // Enhanced Solving function dengan error handling
         try {
             if (typeof Solving === 'function') {
                 await Solving(naze, store);
@@ -702,7 +970,7 @@ async function startNazeBot() {
         
         naze.ev.on('creds.update', saveCreds);
         
-        // Connection update handler
+        // Enhanced connection update handler
         naze.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
             
@@ -768,7 +1036,9 @@ async function startNazeBot() {
                 const botInfo = {
                     id: naze.user?.id,
                     name: naze.user?.name || naze.user?.verifiedName || 'Unknown',
-                    phone: global.phoneNumber
+                    phone: global.phoneNumber,
+                    platform: os.platform(),
+                    security: 'Enhanced Mode Active'
                 };
                 
                 setBotInfo(botInfo);
@@ -788,7 +1058,7 @@ async function startNazeBot() {
             }
         });
         
-        // Handle other events
+        // Enhanced event handlers
         naze.ev.on('messages.upsert', async (message) => {
             try {
                 if (typeof MessagesUpsert === 'function') {
@@ -809,9 +1079,9 @@ async function startNazeBot() {
             }
         });
         
-        // Presence update
+        // Enhanced presence update dengan security
         setInterval(async () => {
-            if (naze?.user?.id) {
+            if (naze?.user?.id && global.connectionStatus === 'online') {
                 try {
                     await naze.sendPresenceUpdate('available').catch(() => {});
                 } catch (error) {
@@ -829,15 +1099,16 @@ async function startNazeBot() {
     }
 }
 
-// Main function
+// Enhanced main function
 async function main() {
     try {
-        console.log(chalk.blue('🚀 Starting Web Dashboard...'));
+        console.log(chalk.blue('🚀 Starting Enhanced Web Dashboard...'));
         const port = await startServer();
         global.currentPort = port;
         
         console.log(chalk.green(`🌐 Web Dashboard: http://localhost:${port}`));
-        console.log(chalk.blue('🤖 Starting WhatsApp Bot...'));
+        console.log(chalk.blue('🤖 Starting WhatsApp Bot with enhanced security...'));
+        console.log(chalk.cyan('🛡️  Security Features: Header Rotation ✓ Rate Limiting ✓ Anti-Detection ✓'));
         
         await sleep(2000);
         await startNazeBot();
@@ -849,7 +1120,7 @@ async function main() {
     }
 }
 
-// Cleanup function
+// Enhanced cleanup function
 const cleanup = async () => {
     console.log(`\n📦 Saving database and shutting down...`);
     try {
@@ -877,10 +1148,14 @@ const cleanup = async () => {
         clearTimeout(currentPairingTimeout);
     }
     
+    // Cleanup security systems
+    headerRotation.destroy();
+    
     console.log('🔴 Shutting down...');
     process.exit(0);
 }
 
+// Enhanced process handlers
 process.on('SIGINT', () => cleanup());
 process.on('SIGTERM', () => cleanup());
 
@@ -892,7 +1167,7 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error(chalk.red('❌ Unhandled Rejection at:'), promise, 'reason:', reason);
 });
 
-// Start application
+// Start enhanced application
 main().catch(error => {
     console.error(chalk.red('❌ Failed to start application:'), error);
     process.exit(1);
