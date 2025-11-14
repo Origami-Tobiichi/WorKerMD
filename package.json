@@ -33,7 +33,7 @@
     "baileys": "^6.7.21",
     "chalk": "4.1.2",
     "https-proxy-agent": "^7.0.6",
-    "socks-proxy-agent": "^8.0.5"
+    "socks-proxy-agent": "^8.0.5",
     "cheerio": "^1.0.0-rc.10",
     "chess.js": "^1.2.0",
     "child_process": "^1.0.2",
