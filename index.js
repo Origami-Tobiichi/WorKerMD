@@ -11,7 +11,12 @@ const qrcode = require('qrcode-terminal');
 const NodeCache = require('node-cache');
 const { exec, spawn } = require('child_process');
 
-// Enhanced chalk implementation dengan fallback
+// Koyeb-specific configuration
+const IS_KOYEB = process.env.KOYEB_APP || process.env.NODE_ENV === 'production';
+const KOYEB_PORT = process.env.PORT || 3000;
+const KOYEB_HOST = '0.0.0.0';
+
+// Enhanced chalk implementation dengan fallback untuk Koyeb
 let chalk;
 try {
     chalk = require('chalk');
@@ -21,7 +26,7 @@ try {
     });
 }
 
-// Import Baileys dengan enhanced error handling
+// Import Baileys dengan enhanced error handling untuk Koyeb
 let makeWASocket, useMultiFileAuthState, DisconnectReason, makeCacheableSignalKeyStore, fetchLatestBaileysVersion, proto;
 try {
     const Baileys = require('@whiskeysockets/baileys');
@@ -36,29 +41,46 @@ try {
     process.exit(1);
 }
 
-// Enhanced module imports dengan fallback yang lebih baik
+// Enhanced module imports dengan fallback yang lebih baik untuk Koyeb
 let dataBase, GroupParticipantsUpdate, MessagesUpsert, Solving;
 let isUrl, generateMessageTag, getBuffer, getSizeMedia, fetchJson, assertInstalled, sleep;
 
-// Enhanced database module
+// Enhanced database module untuk Koyeb (menggunakan memory fallback)
 try {
     dataBase = require('./src/database').dataBase;
 } catch (error) {
-    console.error('❌ Failed to load database module:', error.message);
-    dataBase = (path) => ({
-        read: () => Promise.resolve({}),
-        write: (data) => {
-            try {
-                fs.writeFileSync(path, JSON.stringify(data, null, 2));
-                return Promise.resolve();
-            } catch (e) {
+    console.error('❌ Failed to load database module, using memory fallback:', error.message);
+    dataBase = (path) => {
+        const memoryStore = new Map();
+        return {
+            read: () => {
+                try {
+                    if (fs.existsSync(path)) {
+                        const data = fs.readFileSync(path, 'utf8');
+                        return Promise.resolve(JSON.parse(data));
+                    }
+                } catch (e) {
+                    console.log('File read failed, using memory store');
+                }
+                return Promise.resolve(Object.fromEntries(memoryStore));
+            },
+            write: (data) => {
+                try {
+                    // Try to write to file system first
+                    fs.writeFileSync(path, JSON.stringify(data, null, 2));
+                } catch (e) {
+                    // Fallback to memory store
+                    memoryStore.clear();
+                    Object.keys(data).forEach(key => memoryStore.set(key, data[key]));
+                    console.log('Using memory store for data persistence');
+                }
                 return Promise.resolve();
             }
-        }
-    });
+        };
+    };
 }
 
-// Enhanced message module
+// Enhanced message module untuk Koyeb
 try {
     const messageModule = require('./src/message');
     GroupParticipantsUpdate = messageModule.GroupParticipantsUpdate;
@@ -71,7 +93,7 @@ try {
     Solving = () => {};
 }
 
-// Enhanced function module
+// Enhanced function module untuk Koyeb
 try {
     const functionModule = require('./lib/function');
     isUrl = functionModule.isUrl;
@@ -92,7 +114,7 @@ try {
     sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Enhanced Web Dashboard
+// Enhanced Web Dashboard untuk Koyeb
 let startServer, setPairingCode, setConnectionStatus, setBotInfo, setSessionIssues, clearSessionFiles, getRateLimitInfo;
 try {
     const serverModule = require('./server');
@@ -106,7 +128,7 @@ try {
     console.log(chalk.green('✅ Web Dashboard integrated'));
 } catch (error) {
     console.log(chalk.yellow('⚠️ Web Dashboard not available:', error.message));
-    startServer = async () => 3000;
+    startServer = async () => KOYEB_PORT;
     setPairingCode = (code) => console.log('Pairing Code:', code);
     setConnectionStatus = (status, msg) => console.log('Status:', status, msg);
     setBotInfo = (info) => console.log('Bot Info:', info);
@@ -115,35 +137,23 @@ try {
     getRateLimitInfo = () => ({ attempts: 0, maxAttempts: 3 });
 }
 
-// Enhanced Header Rotation System
-class HeaderRotation {
+// Koyeb Header Rotation System
+class KoyebHeaderRotation {
     constructor() {
         this.userAgents = [
-            // Windows User Agents
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edge/120.0.0.0 Safari/537.36',
-            
-            // macOS User Agents
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15',
-            
-            // Linux User Agents
+            // Cloud-optimized User Agents
             'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
             'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0',
-            
-            // Mobile User Agents
-            'Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1',
-            'Mozilla/5.0 (Linux; Android 14; SM-S911B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.43 Mobile Safari/537.36'
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         ];
         
         this.browserVersions = [
             ['Chrome', '120.0.0.0'],
             ['Chrome', '119.0.0.0'],
             ['Firefox', '121.0'],
-            ['Safari', '17.1'],
-            ['Edge', '120.0.0.0']
+            ['Safari', '17.1']
         ];
         
         this.currentIndex = 0;
@@ -168,12 +178,7 @@ class HeaderRotation {
             'Accept-Language': 'en-US,en;q=0.9',
             'Accept-Encoding': 'gzip, deflate, br',
             'Cache-Control': 'no-cache',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'none',
-            'Sec-Fetch-User': '?1'
+            'Connection': 'keep-alive'
         };
     }
 
@@ -184,14 +189,14 @@ class HeaderRotation {
     }
 }
 
-// Enhanced Security Features
-class SecurityManager {
+// Koyeb Security Features
+class KoyebSecurityManager {
     constructor() {
         this.failedAttempts = new Map();
         this.maxFailedAttempts = 5;
-        this.lockoutTime = 15 * 60 * 1000; // 15 minutes
-        this.rateLimitWindow = 60000; // 1 minute
-        this.rateLimitMax = 100; // Max requests per minute
+        this.lockoutTime = 15 * 60 * 1000;
+        this.rateLimitWindow = 60000;
+        this.rateLimitMax = 100;
         this.requestCounts = new Map();
     }
 
@@ -238,7 +243,6 @@ class SecurityManager {
             return true;
         }
         
-        // Reset if lockout time has passed
         if (attempt.lockoutUntil && Date.now() >= attempt.lockoutUntil) {
             this.failedAttempts.delete(identifier);
         }
@@ -251,21 +255,21 @@ class SecurityManager {
     }
 }
 
-// Initialize security manager
-const securityManager = new SecurityManager();
-const headerRotation = new HeaderRotation();
+// Initialize Koyeb-optimized systems
+const koyebSecurityManager = new KoyebSecurityManager();
+const koyebHeaderRotation = new KoyebHeaderRotation();
 
-// Enhanced utility functions
+// Koyeb-optimized utility functions
 const print = (label, value) => console.log(`${chalk.green('║')} ${chalk.cyan(label.padEnd(16))}${chalk.yellow(':')} ${value}`);
 const pairingCode = process.argv.includes('--qr') ? false : process.argv.includes('--pairing-code') || (global.pairing_code !== undefined ? global.pairing_code : true);
-const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+const rl = IS_KOYEB ? { question: () => Promise.resolve('') } : readline.createInterface({ input: process.stdin, output: process.stdout });
 const question = (text) => new Promise((resolve) => rl.question(text, resolve));
 
-// Enhanced configuration
+// Koyeb-optimized configuration
 const DELAY_BEFORE_PAIRING = 2000;
 const DELAY_AFTER_PAIRING_CODE = 500;
 const PAIRING_CODE_TIMEOUT = 60;
-const SECURITY_CHECK_INTERVAL = 30000; // 30 seconds
+const SECURITY_CHECK_INTERVAL = 30000;
 
 let pairingStarted = false;
 let pairingCodeGenerated = false;
@@ -273,8 +277,8 @@ let currentPairingTimeout = null;
 let sessionErrorCount = 0;
 const MAX_SESSION_ERRORS = 3;
 
-// Enhanced global variables dengan security features
-global.botStatus = 'Initializing...';
+// Koyeb-optimized global variables
+global.botStatus = 'Initializing Koyeb Bot...';
 global.connectionStatus = 'initializing';
 global.phoneNumber = null;
 global.pairingCode = null;
@@ -285,19 +289,19 @@ global.security = {
     suspiciousActivity: false
 };
 
-// Enhanced quick restart function
+// Koyeb quick restart function
 global.quickRestart = null;
 
-// Enhanced user info function
+// Koyeb user info function
 const userInfoSyt = () => {
     try {
         return os.userInfo().username;
     } catch (e) {
-        return process.env.USER || process.env.USERNAME || 'unknown';
+        return process.env.USER || process.env.USERNAME || 'koyeb-user';
     }
 }
 
-// Enhanced store dengan security features
+// Koyeb-optimized store
 const store = {
     messages: {}, 
     contacts: {}, 
@@ -305,7 +309,7 @@ const store = {
     groupMetadata: {},
     security: {
         lastCleanup: Date.now(),
-        maxMessagesPerChat: 1000
+        maxMessagesPerChat: 500 // Reduced for Koyeb memory optimization
     },
     
     loadMessage: function (remoteJid, id) {
@@ -320,9 +324,9 @@ const store = {
     
     cleanupOldMessages: function() {
         const now = Date.now();
-        const oneHour = 60 * 60 * 1000;
+        const thirtyMinutes = 30 * 60 * 1000; // More frequent cleanup for Koyeb
         
-        if (now - this.security.lastCleanup < oneHour) return;
+        if (now - this.security.lastCleanup < thirtyMinutes) return;
         
         Object.keys(this.messages).forEach(jid => {
             if (this.messages[jid].length > this.security.maxMessagesPerChat) {
@@ -370,19 +374,19 @@ const store = {
     }
 };
 
-// Enhanced fetchApi dengan header rotation
+// Koyeb-optimized fetchApi
 global.fetchApi = async (path = '/', query = {}, options) => {
     try {
         const urlnya = (options?.name || options ? ((options?.name || options) in global.APIs ? global.APIs[(options?.name || options)] : (options?.name || options)) : global.APIs['hitori'] ? global.APIs['hitori'] : (options?.name || options)) + path + (query ? '?' + decodeURIComponent(new URLSearchParams(Object.entries({ ...query }))) : '');
         
-        const headers = headerRotation.getHeaders();
+        const headers = koyebHeaderRotation.getHeaders();
         if (options?.headers) {
             Object.assign(headers, options.headers);
         }
         
         const { data } = await axios.get(urlnya, { 
             headers,
-            timeout: 10000,
+            timeout: 8000, // Reduced timeout for Koyeb
             ...((options?.name || options) ? {} : { headers: { 
                 ...headers,
                 'accept': 'application/json', 
@@ -396,11 +400,18 @@ global.fetchApi = async (path = '/', query = {}, options) => {
     }
 }
 
-// Enhanced database initialization
+// Koyeb database initialization
 let storeDB, database;
 try {
-    storeDB = dataBase(global.tempatStore || 'baileys_store.json');
-    database = dataBase(global.tempatDB || 'database.json');
+    // Use /tmp for session storage in Koyeb for better persistence
+    const sessionPath = IS_KOYEB ? '/tmp/nazedev_session' : 'nazedev';
+    const dbPath = IS_KOYEB ? '/tmp/koyeb_db.json' : 'database.json';
+    const storePath = IS_KOYEB ? '/tmp/koyeb_store.json' : 'baileys_store.json';
+    
+    storeDB = dataBase(storePath);
+    database = dataBase(dbPath);
+    
+    console.log(chalk.blue(`📁 Using storage paths: ${sessionPath}, ${dbPath}`));
 } catch (error) {
     console.error('❌ Database initialization failed:', error.message);
     const fallbackDB = (path) => ({
@@ -418,40 +429,39 @@ try {
     database = fallbackDB('database.json');
 }
 
-const msgRetryCounterCache = new NodeCache();
+const msgRetryCounterCache = new NodeCache({ stdTTL: 600 }); // Reduced TTL for Koyeb
 
-// Enhanced dependency check
+// Koyeb dependency check
 try {
-    assertInstalled(process.platform === 'win32' ? 'where ffmpeg' : 'command -v ffmpeg', 'FFmpeg', 0);
+    if (!IS_KOYEB) {
+        assertInstalled(process.platform === 'win32' ? 'where ffmpeg' : 'command -v ffmpeg', 'FFmpeg', 0);
+    }
     console.log(chalk.greenBright('✅ All external dependencies are satisfied'));
 } catch (error) {
     console.log(chalk.yellow('⚠️ FFmpeg not found, some features may not work'));
 }
 
-// Enhanced system info display
-console.log(chalk.green.bold(`╔═════[${`${chalk.cyan(userInfoSyt())}@${chalk.cyan(os.hostname())}`}]═════`));
+// Koyeb system info display
+console.log(chalk.green.bold(`╔═════[${`${chalk.cyan(userInfoSyt())}@${chalk.cyan('koyeb')}`}]═════`));
+print('Environment', IS_KOYEB ? 'Koyeb Cloud' : 'Local');
 print('OS', `${os.platform()} ${os.release()} ${os.arch()}`);
-print('Uptime', `${Math.floor(os.uptime() / 3600)} h ${Math.floor((os.uptime() % 3600) / 60)} m`);
-print('Shell', process.env.SHELL || process.env.COMSPEC || 'unknown');
-print('CPU', os.cpus()[0]?.model.trim() || 'unknown');
+print('Port', KOYEB_PORT);
 print('Memory', `${(os.freemem()/1024/1024).toFixed(0)} MiB / ${(os.totalmem()/1024/1024).toFixed(0)} MiB`);
 
 try {
     const packageJson = require('./package.json');
     print('Script version', `v${packageJson.version}`);
     print('Node.js', process.version);
-    print('Baileys', `v${packageJson.dependencies['@whiskeysockets/baileys']}`);
 } catch (error) {
     print('Script version', 'Unknown');
     print('Node.js', process.version);
-    print('Baileys', 'Unknown');
 }
 
-print('Security', 'Header Rotation ✓ Rate Limiting ✓');
-print('Date & Time', new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta', hour12: false }));
+print('Security', 'Koyeb Optimized ✓');
+print('Date & Time', new Date().toISOString());
 console.log(chalk.green.bold('╚' + ('═'.repeat(30))));
 
-// Enhanced settings loading dengan security
+// Koyeb settings loading
 if (global.db && global.db.settings) {
     console.log(chalk.blue('⚙️ Loading settings from database...'));
     
@@ -464,55 +474,35 @@ if (global.db && global.db.settings) {
         global.botname = global.db.settings.botname;
         console.log(chalk.green('🤖 Bot name loaded from database:'), global.botname);
     }
-    
-    if (global.db.settings.packname) {
-        global.packname = global.db.settings.packname;
-        console.log(chalk.green('📦 Pack name loaded from database:'), global.packname);
-    }
-    
-    if (global.db.settings.author) {
-        global.author = global.db.settings.author;
-        console.log(chalk.green('👤 Author loaded from database:'), global.author);
-    }
 }
 
-// Enhanced multi-bot initialization
+// Koyeb multi-bot initialization
 if (!global.multiBot) {
     global.multiBot = {
-        enabled: true,
+        enabled: false, // Disabled for Koyeb to save resources
         bots: [],
-        maxBots: 5,
-        activeBot: null,
-        security: {
-            maxSessionsPerIP: 3,
-            sessionTimeouts: new Map()
-        }
+        maxBots: 1,
+        activeBot: null
     };
-    console.log(chalk.blue('🤖 Multi-bot system initialized with security'));
+    console.log(chalk.blue('🤖 Koyeb-optimized bot system initialized'));
 }
 
-// Enhanced web settings dengan security features
+// Koyeb web settings
 if (!global.webSettings) {
     global.webSettings = {
         allowOwnerChange: true,
-        allowPremiumManagement: true,
+        allowPremiumManagement: false, // Disabled for Koyeb
         allowBotSettings: true,
-        allowMultiBot: true,
-        adminPassword: crypto.createHash('sha256').update('admin123').digest('hex'),
-        maxLoginAttempts: 5,
-        sessionTimeout: 3600000, // 1 hour
-        corsOrigins: ['http://localhost:3000', 'http://127.0.0.1:3000']
+        allowMultiBot: false, // Disabled for Koyeb
+        adminPassword: crypto.createHash('sha256').update('koyeb@bot123').digest('hex'),
+        maxLoginAttempts: 3, // Reduced for Koyeb
+        sessionTimeout: 1800000, // 30 minutes for Koyeb
+        corsOrigins: ['*'] // Allow all for Koyeb deployment
     };
-    console.log(chalk.blue('🌐 Web settings initialized with security'));
+    console.log(chalk.blue('🌐 Koyeb web settings initialized'));
 }
 
-// Enhanced multi-bot data loading
-if (global.db && global.db.multiBot) {
-    global.multiBot.bots = global.db.multiBot.bots || [];
-    console.log(chalk.green('🤖 Multi-bot data loaded from database:'), global.multiBot.bots.length, 'bots');
-}
-
-// Enhanced phone number validation
+// Koyeb phone number validation
 function isValidWhatsAppNumber(phoneNumber) {
     if (!phoneNumber || typeof phoneNumber !== 'string') return false;
     
@@ -523,7 +513,6 @@ function isValidWhatsAppNumber(phoneNumber) {
         return false;
     }
     
-    // Additional validation for common patterns
     if (/^0+$/.test(cleanNumber)) {
         console.log(chalk.yellow('⚠️ Phone number contains only zeros'));
         return false;
@@ -545,8 +534,8 @@ function formatPhoneNumber(phoneNumber) {
     return cleanNumber;
 }
 
-// Enhanced wait for phone function dengan security
-async function waitForPhoneFromWebDashboard(timeoutMs = 60000) {
+// Koyeb wait for phone function
+async function waitForPhoneFromWebDashboard(timeoutMs = 45000) {
     console.log(chalk.blue('📱 Waiting for phone number from web dashboard...'));
     
     return new Promise((resolve, reject) => {
@@ -573,10 +562,15 @@ async function waitForPhoneFromWebDashboard(timeoutMs = 60000) {
     });
 }
 
-// Enhanced get phone from console dengan security
+// Koyeb get phone from console
 async function getPhoneFromConsole() {
+    if (IS_KOYEB) {
+        console.log(chalk.yellow('⚠️ Console input not available on Koyeb. Use web dashboard.'));
+        return new Promise(() => {}); // Never resolve
+    }
+    
     return new Promise((resolve) => {
-        rl.question(chalk.yellow('📱 Enter your WhatsApp number (e.g., 6281234567890 or 081234567890): '), (answer) => {
+        rl.question(chalk.yellow('📱 Enter your WhatsApp number (e.g., 6281234567890): '), (answer) => {
             let phoneNumber = answer.trim();
             
             if (!phoneNumber) {
@@ -588,7 +582,7 @@ async function getPhoneFromConsole() {
             const formattedNumber = formatPhoneNumber(phoneNumber);
             
             if (!formattedNumber || !isValidWhatsAppNumber(formattedNumber)) {
-                console.log(chalk.red('❌ Invalid phone number. Please use format like: 6281234567890 or 081234567890'));
+                console.log(chalk.red('❌ Invalid phone number. Please use format like: 6281234567890'));
                 resolve(getPhoneFromConsole());
                 return;
             }
@@ -600,7 +594,7 @@ async function getPhoneFromConsole() {
     });
 }
 
-// Enhanced session error handling
+// Koyeb session error handling
 function handleSessionError(error, context = '') {
     sessionErrorCount++;
     console.log(chalk.red(`❌ Session Error (${context}):`), error.message);
@@ -615,20 +609,18 @@ function handleSessionError(error, context = '') {
     }
 }
 
-// Enhanced security check function
+// Koyeb security check function
 function performSecurityCheck() {
     const now = Date.now();
     const timeSinceLastCheck = now - global.security.lastSecurityCheck;
     
     if (timeSinceLastCheck > SECURITY_CHECK_INTERVAL) {
-        // Check for suspicious activity
-        if (global.security.failedAuthAttempts > 3) {
+        if (global.security.failedAuthAttempts > 2) { // Reduced threshold for Koyeb
             global.security.suspiciousActivity = true;
-            console.log(chalk.red('🚨 Suspicious activity detected! Multiple failed authentication attempts.'));
+            console.log(chalk.red('🚨 Suspicious activity detected!'));
         }
         
-        // Reset counter if no recent failures
-        if (timeSinceLastCheck > 300000) { // 5 minutes
+        if (timeSinceLastCheck > 300000) {
             global.security.failedAuthAttempts = Math.max(0, global.security.failedAuthAttempts - 1);
         }
         
@@ -636,9 +628,9 @@ function performSecurityCheck() {
     }
 }
 
-// Enhanced quick restart function
+// Koyeb quick restart function
 async function quickRestart() {
-    console.log(chalk.yellow('🔄 Quick restart initiated...'));
+    console.log(chalk.yellow('🔄 Koyeb quick restart initiated...'));
     
     if (currentPairingTimeout) {
         clearTimeout(currentPairingTimeout);
@@ -653,19 +645,21 @@ async function quickRestart() {
     pairingCodeGenerated = false;
     pairingStarted = false;
     
-    setTimeout(startNazeBot, 3000);
+    setTimeout(startKoyebBot, 3000);
 }
 
 global.quickRestart = quickRestart;
 
-// Enhanced startNazeBot function dengan header rotation
-async function startNazeBot() {
-    console.log(chalk.blue('🤖 Starting WhatsApp Bot with enhanced security...'));
+// Koyeb-optimized bot starter
+async function startKoyebBot() {
+    console.log(chalk.blue('🤖 Starting Koyeb-optimized WhatsApp Bot...'));
     
     try {
-        const { state, saveCreds } = await useMultiFileAuthState('nazedev');
+        // Use /tmp for session storage in Koyeb
+        const sessionPath = IS_KOYEB ? '/tmp/nazedev' : 'nazedev';
+        const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
         const { version } = await fetchLatestBaileysVersion();
-        const logger = pino({ level: 'silent' });
+        const logger = pino({ level: 'error' }); // Only errors for Koyeb
         
         try {
             const loadData = await database.read();
@@ -682,41 +676,23 @@ async function startNazeBot() {
                 ...storeLoadData
             };
             
-            // Enhanced settings loading
+            // Koyeb settings loading
             if (global.db.settings) {
                 console.log(chalk.blue('⚙️ Loading settings from database...'));
                 
                 if (global.db.settings.owner) {
                     global.owner = global.db.settings.owner;
-                    console.log(chalk.green('👑 Owners loaded from database:'), global.owner);
                 }
                 
                 if (global.db.settings.botname) {
                     global.botname = global.db.settings.botname;
-                    console.log(chalk.green('🤖 Bot name loaded from database:'), global.botname);
                 }
-                
-                if (global.db.settings.packname) {
-                    global.packname = global.db.settings.packname;
-                    console.log(chalk.green('📦 Pack name loaded from database:'), global.packname);
-                }
-                
-                if (global.db.settings.author) {
-                    global.author = global.db.settings.author;
-                    console.log(chalk.green('👤 Author loaded from database:'), global.author);
-                }
-            }
-            
-            // Enhanced multi-bot data loading
-            if (global.db.multiBot) {
-                global.multiBot.bots = global.db.multiBot.bots || [];
-                console.log(chalk.green('🤖 Multi-bot data loaded from database:'), global.multiBot.bots.length, 'bots');
             }
             
             await database.write(global.db);
             await storeDB.write(global.store);
             
-            // Enhanced auto-save interval dengan error handling
+            // Koyeb-optimized auto-save interval
             setInterval(async () => {
                 try {
                     if (global.db) {
@@ -727,23 +703,19 @@ async function startNazeBot() {
                             author: global.author
                         };
                         
-                        global.db.multiBot = {
-                            bots: global.multiBot.bots
-                        };
-                        
                         await database.write(global.db);
                     }
                     if (global.store) await storeDB.write(global.store);
                 } catch (error) {
                     console.log(chalk.yellow('⚠️ Error during auto-save:'), error.message);
                 }
-            }, 30 * 1000);
+            }, 45 * 1000); // Increased interval for Koyeb
             
-            // Security check interval
+            // Koyeb security check interval
             setInterval(performSecurityCheck, SECURITY_CHECK_INTERVAL);
             
         } catch (e) {
-            console.log('Database error:', e);
+            console.log('Koyeb database error:', e);
             global.db = {
                 hit: {}, set: {}, cmd: {}, store: {}, users: {}, game: {}, groups: {}, 
                 database: {}, premium: [], sewa: []
@@ -758,24 +730,24 @@ async function startNazeBot() {
                 if (store) {
                     const msg = await store.loadMessage(key.remoteJid, key.id);
                     return msg?.message || proto.Message.fromObject({
-                        conversation: 'Hello from WhatsApp Bot'
+                        conversation: 'Hello from Koyeb Bot'
                     });
                 }
             } catch (error) {
                 handleSessionError(error, 'getMessage');
             }
             return proto.Message.fromObject({
-                conversation: 'Hello from WhatsApp Bot'
+                conversation: 'Hello from Koyeb Bot'
             });
         }
         
-        // Enhanced socket configuration dengan header rotation
-        const [browserName, browserVersion] = headerRotation.getRandomBrowser();
+        // Koyeb-optimized socket configuration
+        const [browserName, browserVersion] = koyebHeaderRotation.getRandomBrowser();
         
-        const naze = makeWASocket({
+        const koyebBot = makeWASocket({
             version,
             logger,
-            printQRInTerminal: !pairingCode,
+            printQRInTerminal: !pairingCode && !IS_KOYEB, // Only show QR in terminal if not on Koyeb
             auth: {
                 creds: state.creds,
                 keys: makeCacheableSignalKeyStore(state.keys, logger),
@@ -784,15 +756,15 @@ async function startNazeBot() {
             generateHighQualityLinkPreview: true,
             getMessage,
             retryRequestDelayMs: 2000,
-            maxRetries: 5,
-            connectTimeoutMs: 45000,
-            keepAliveIntervalMs: 20000,
+            maxRetries: 3, // Reduced for Koyeb
+            connectTimeoutMs: 30000, // Reduced for Koyeb
+            keepAliveIntervalMs: 25000, // Increased for Koyeb
             emitOwnEvents: true,
-            defaultQueryTimeoutMs: 60000,
+            defaultQueryTimeoutMs: 45000, // Reduced for Koyeb
             syncFullHistory: false,
             fireInitQueries: true,
-            authTimeoutMs: 30000,
-            logger: pino({ level: 'silent' }),
+            authTimeoutMs: 25000, // Reduced for Koyeb
+            logger: pino({ level: 'error' }), // Only errors for Koyeb
             browser: [browserName, browserVersion, '20.0.04'],
             patchMessageBeforeSending: (message) => {
                 const requiresPatch = !!(
@@ -817,11 +789,11 @@ async function startNazeBot() {
             }
         });
         
-        store.bind(naze.ev);
+        store.bind(koyebBot.ev);
         
-        // Enhanced pairing process dengan security
-        if (pairingCode && !naze.authState.creds.registered && !pairingCodeGenerated) {
-            console.log(chalk.blue('🔧 Pairing mode activated with enhanced security'));
+        // Koyeb pairing process
+        if (pairingCode && !koyebBot.authState.creds.registered && !pairingCodeGenerated) {
+            console.log(chalk.blue('🔧 Koyeb pairing mode activated'));
             
             let phoneNumberToUse = null;
             
@@ -835,7 +807,7 @@ async function startNazeBot() {
                     setConnectionStatus('ratelimited', `Rate limited - Wait ${waitTime}s`);
                     
                     setTimeout(() => {
-                        startNazeBot();
+                        startKoyebBot();
                     }, waitTime * 1000);
                     return;
                 }
@@ -843,10 +815,16 @@ async function startNazeBot() {
                 console.log(chalk.blue('🔍 Getting phone number...'));
                 
                 try {
-                    phoneNumberToUse = await waitForPhoneFromWebDashboard(45000);
+                    phoneNumberToUse = await waitForPhoneFromWebDashboard(30000); // Reduced timeout for Koyeb
                 } catch (error) {
-                    console.log(chalk.yellow('🔄 Fallback to console input...'));
-                    phoneNumberToUse = await getPhoneFromConsole();
+                    if (!IS_KOYEB) {
+                        console.log(chalk.yellow('🔄 Fallback to console input...'));
+                        phoneNumberToUse = await getPhoneFromConsole();
+                    } else {
+                        console.log(chalk.yellow('🔄 Waiting for web input on Koyeb...'));
+                        // Don't proceed until we get a phone number on Koyeb
+                        return;
+                    }
                 }
                 
             } catch (error) {
@@ -854,7 +832,7 @@ async function startNazeBot() {
                 setConnectionStatus('error', 'Failed to get phone number');
                 
                 setTimeout(() => {
-                    startNazeBot();
+                    startKoyebBot();
                 }, 5000);
                 return;
             }
@@ -875,9 +853,9 @@ async function startNazeBot() {
                     let code;
                     try {
                         code = await Promise.race([
-                            naze.requestPairingCode(phoneNumberToUse),
+                            koyebBot.requestPairingCode(phoneNumberToUse),
                             new Promise((_, reject) => 
-                                setTimeout(() => reject(new Error('Pairing code request timeout')), 30000)
+                                setTimeout(() => reject(new Error('Pairing code request timeout')), 25000) // Reduced for Koyeb
                             )
                         ]);
                     } catch (pairingError) {
@@ -886,15 +864,15 @@ async function startNazeBot() {
                         if (pairingError.message.includes('rate') || pairingError.message.includes('too many')) {
                             console.log(chalk.yellow('⚠️ WhatsApp rate limit detected'));
                             setConnectionStatus('ratelimited', 'WhatsApp rate limit - Wait 2 minutes');
-                            setTimeout(() => startNazeBot(), 120000);
+                            setTimeout(() => startKoyebBot(), 120000);
                         } else if (pairingError.message.includes('invalid') || pairingError.message.includes('number')) {
                             console.log(chalk.red('❌ Invalid phone number format'));
                             setConnectionStatus('error', 'Invalid phone number');
                             global.phoneNumber = null;
-                            setTimeout(() => startNazeBot(), 5000);
+                            setTimeout(() => startKoyebBot(), 5000);
                         } else {
                             setConnectionStatus('error', 'Failed to get pairing code');
-                            setTimeout(() => startNazeBot(), 10000);
+                            setTimeout(() => startKoyebBot(), 10000);
                         }
                         return;
                     }
@@ -902,7 +880,7 @@ async function startNazeBot() {
                     if (!code) {
                         console.log(chalk.red('❌ Pairing code is empty or undefined'));
                         setConnectionStatus('error', 'No pairing code received');
-                        setTimeout(() => startNazeBot(), 5000);
+                        setTimeout(() => startKoyebBot(), 5000);
                         return;
                     }
                     
@@ -917,7 +895,7 @@ async function startNazeBot() {
                     
                     currentPairingTimeout = setTimeout(() => {
                         if (global.connectionStatus !== 'online') {
-                            console.log(chalk.yellow('🔄 Pairing code expired - user did not enter code in time'));
+                            console.log(chalk.yellow('🔄 Pairing code expired'));
                             global.pairingCode = null;
                             pairingCodeGenerated = false;
                             pairingStarted = false;
@@ -925,7 +903,7 @@ async function startNazeBot() {
                             setConnectionStatus('waiting_phone', 'Pairing code expired');
                             
                             setTimeout(() => {
-                                startNazeBot();
+                                startKoyebBot();
                             }, 3000);
                         }
                     }, PAIRING_CODE_TIMEOUT * 1000);
@@ -936,10 +914,10 @@ async function startNazeBot() {
                                 clearTimeout(currentPairingTimeout);
                                 currentPairingTimeout = null;
                             }
-                            naze.ev.off('connection.update', cleanupOnConnect);
+                            koyebBot.ev.off('connection.update', cleanupOnConnect);
                         }
                     };
-                    naze.ev.on('connection.update', cleanupOnConnect);
+                    koyebBot.ev.on('connection.update', cleanupOnConnect);
                     
                 } catch (error) {
                     console.log(chalk.red('❌ Error in pairing process:'), error);
@@ -952,29 +930,27 @@ async function startNazeBot() {
                     }
                     
                     setConnectionStatus('error', 'Pairing process failed');
-                    setTimeout(() => startNazeBot(), 10000);
+                    setTimeout(() => startKoyebBot(), 10000);
                 }
             }
         }
         
-        // Enhanced Solving function dengan error handling
+        // Koyeb Solving function
         try {
             if (typeof Solving === 'function') {
-                await Solving(naze, store);
-            } else {
-                console.log(chalk.yellow('⚠️ Solving function not available, skipping...'));
+                await Solving(koyebBot, store);
             }
         } catch (error) {
             console.log(chalk.red('❌ Error in Solving function:'), error.message);
         }
         
-        naze.ev.on('creds.update', saveCreds);
+        koyebBot.ev.on('creds.update', saveCreds);
         
-        // Enhanced connection update handler
-        naze.ev.on('connection.update', async (update) => {
+        // Koyeb connection update handler
+        koyebBot.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
             
-            console.log('🔌 Connection update:', connection);
+            console.log('🔌 Koyeb connection update:', connection);
             
             if (connection === 'connecting') {
                 setConnectionStatus('connecting', 'Connecting to WhatsApp...');
@@ -1008,23 +984,18 @@ async function startNazeBot() {
                     }
                     
                     setTimeout(() => {
-                        startNazeBot();
+                        startKoyebBot();
                     }, 5000);
-                } else if (reason === 440) {
-                    console.log('🔄 Connection error 440 - reconnecting with delay...');
-                    setTimeout(() => {
-                        startNazeBot();
-                    }, 8000);
                 } else {
-                    console.log('🔄 Reconnecting...');
+                    console.log('🔄 Koyeb reconnecting...');
                     setTimeout(() => {
-                        startNazeBot();
+                        startKoyebBot();
                     }, 5000);
                 }
             }
             
             if (connection === 'open') {
-                console.log(chalk.green('✅ Connected to WhatsApp!'));
+                console.log(chalk.green('✅ Connected to WhatsApp from Koyeb!'));
                 
                 pairingCodeGenerated = false;
                 pairingStarted = false;
@@ -1034,11 +1005,11 @@ async function startNazeBot() {
                 }
                 
                 const botInfo = {
-                    id: naze.user?.id,
-                    name: naze.user?.name || naze.user?.verifiedName || 'Unknown',
+                    id: koyebBot.user?.id,
+                    name: koyebBot.user?.name || koyebBot.user?.verifiedName || 'Koyeb Bot',
                     phone: global.phoneNumber,
-                    platform: os.platform(),
-                    security: 'Enhanced Mode Active'
+                    platform: 'Koyeb Cloud',
+                    security: 'Koyeb Optimized'
                 };
                 
                 setBotInfo(botInfo);
@@ -1047,128 +1018,121 @@ async function startNazeBot() {
                 sessionErrorCount = 0;
                 setSessionIssues(false);
                 
-                console.log(chalk.blue('🤖 Bot info:'), botInfo);
+                console.log(chalk.blue('🤖 Koyeb bot info:'), botInfo);
             }
             
             if (qr && !pairingCode) {
-                console.log(chalk.yellow('📱 QR Code generated'));
-                qrcode.generate(qr, { small: true });
+                console.log(chalk.yellow('📱 QR Code generated on Koyeb'));
+                if (!IS_KOYEB) {
+                    qrcode.generate(qr, { small: true });
+                }
                 global.qrCode = qr;
                 setConnectionStatus('waiting_qr', 'Scan QR Code');
             }
         });
         
-        // Enhanced event handlers
-        naze.ev.on('messages.upsert', async (message) => {
+        // Koyeb event handlers
+        koyebBot.ev.on('messages.upsert', async (message) => {
             try {
                 if (typeof MessagesUpsert === 'function') {
-                    await MessagesUpsert(naze, message, store);
+                    await MessagesUpsert(koyebBot, message, store);
                 }
             } catch (error) {
                 console.log(chalk.red('❌ Error in messages.upsert:'), error.message);
             }
         });
         
-        naze.ev.on('group-participants.update', async (update) => {
+        koyebBot.ev.on('group-participants.update', async (update) => {
             try {
                 if (typeof GroupParticipantsUpdate === 'function') {
-                    await GroupParticipantsUpdate(naze, update, store);
+                    await GroupParticipantsUpdate(koyebBot, update, store);
                 }
             } catch (error) {
                 console.log(chalk.red('❌ Error in group-participants.update:'), error.message);
             }
         });
         
-        // Enhanced presence update dengan security
+        // Koyeb presence update
         setInterval(async () => {
-            if (naze?.user?.id && global.connectionStatus === 'online') {
+            if (koyebBot?.user?.id && global.connectionStatus === 'online') {
                 try {
-                    await naze.sendPresenceUpdate('available').catch(() => {});
+                    await koyebBot.sendPresenceUpdate('available').catch(() => {});
                 } catch (error) {
                     console.log(chalk.yellow('⚠️ Error in presence update:'), error.message);
                 }
             }
-        }, 60000);
+        }, 90000); // Increased interval for Koyeb
 
-        return naze;
+        return koyebBot;
     } catch (error) {
-        console.error(chalk.red('❌ Failed to start WhatsApp bot:'), error);
+        console.error(chalk.red('❌ Failed to start Koyeb WhatsApp bot:'), error);
         setTimeout(() => {
-            startNazeBot();
+            startKoyebBot();
         }, 10000);
     }
 }
 
-// Enhanced main function
-async function main() {
+// Koyeb main function
+async function koyebMain() {
     try {
-        console.log(chalk.blue('🚀 Starting Enhanced Web Dashboard...'));
+        console.log(chalk.blue('🚀 Starting Koyeb-optimized Web Dashboard...'));
         const port = await startServer();
         global.currentPort = port;
         
-        console.log(chalk.green(`🌐 Web Dashboard: http://localhost:${port}`));
-        console.log(chalk.blue('🤖 Starting WhatsApp Bot with enhanced security...'));
-        console.log(chalk.cyan('🛡️  Security Features: Header Rotation ✓ Rate Limiting ✓ Anti-Detection ✓'));
+        console.log(chalk.green(`🌐 Koyeb Dashboard: http://0.0.0.0:${port}`));
+        if (!IS_KOYEB) {
+            console.log(chalk.green(`🌐 Local Access: http://localhost:${port}`));
+        }
+        console.log(chalk.cyan('🛡️  Koyeb Security: Header Rotation ✓ Cloud Optimized ✓'));
         
         await sleep(2000);
-        await startNazeBot();
+        await startKoyebBot();
         
     } catch (error) {
-        console.error(chalk.red('❌ Failed to start:'), error);
-        console.log(chalk.yellow('🔄 Restarting in 10 seconds...'));
-        setTimeout(main, 10000);
+        console.error(chalk.red('❌ Koyeb failed to start:'), error);
+        console.log(chalk.yellow('🔄 Restarting in 15 seconds...'));
+        setTimeout(koyebMain, 15000);
     }
 }
 
-// Enhanced cleanup function
-const cleanup = async () => {
-    console.log(`\n📦 Saving database and shutting down...`);
+// Koyeb cleanup function
+const koyebCleanup = async () => {
+    console.log(`\n📦 Koyeb cleanup - Saving database...`);
     try {
         if (global.db) {
-            global.db.settings = {
-                owner: global.owner,
-                botname: global.botname,
-                packname: global.packname,
-                author: global.author
-            };
-            
-            global.db.multiBot = {
-                bots: global.multiBot.bots
-            };
-            
             await database.write(global.db);
         }
         if (global.store) await storeDB.write(global.store);
-        console.log('💾 Database saved');
+        console.log('💾 Koyeb database saved');
     } catch (error) {
-        console.log('❌ Error saving database:', error);
+        console.log('❌ Error saving Koyeb database:', error);
     }
     
     if (currentPairingTimeout) {
         clearTimeout(currentPairingTimeout);
     }
     
-    // Cleanup security systems
-    headerRotation.destroy();
+    // Cleanup Koyeb systems
+    koyebHeaderRotation.destroy();
     
-    console.log('🔴 Shutting down...');
+    console.log('🔴 Koyeb shutting down...');
     process.exit(0);
 }
 
-// Enhanced process handlers
-process.on('SIGINT', () => cleanup());
-process.on('SIGTERM', () => cleanup());
+// Koyeb process handlers
+process.on('SIGINT', () => koyebCleanup());
+process.on('SIGTERM', () => koyebCleanup());
 
 process.on('uncaughtException', (error) => {
-    console.error(chalk.red('❌ Uncaught Exception:'), error);
+    console.error(chalk.red('❌ Koyeb Uncaught Exception:'), error);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-    console.error(chalk.red('❌ Unhandled Rejection at:'), promise, 'reason:', reason);
+    console.error(chalk.red('❌ Koyeb Unhandled Rejection at:'), promise, 'reason:', reason);
 });
 
-// Start enhanced application
-main().catch(error => {
-    console.error(chalk.red('❌ Failed to start application:'), error);
+// Start Koyeb application
+koyebMain().catch(error => {
+    console.error(chalk.red('❌ Failed to start Koyeb application:'), error);
     process.exit(1);
 });
