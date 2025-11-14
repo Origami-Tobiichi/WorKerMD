@@ -2,13 +2,13 @@
   "name": "hitori",
   "version": "1.0.8",
   "description": "Bot WhatsApp Using Lib Baileys Multi Device",
-  "main": "start.js --pairing-code",
+  "main": "start.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node start.js --pairing-code",
-    "dev": "nodemon index.js --pairing-code",
-    "debug": "DEBUG=* node start.js --pairing-code",
-    "web": "node index.js --pairing-code"
+    "start": "node start.js",
+    "dev": "nodemon index.js",
+    "debug": "DEBUG=* node start.js",
+    "web": "node index.js"
   },
   "keywords": [
     "whatsapp-bot",
