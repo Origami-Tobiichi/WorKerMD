@@ -19,7 +19,7 @@ try {
 const app = express();
 let server = null;
 let CURRENT_PORT = process.env.PORT || 3000;
-let isServerRunning = false;
+let isServerRunning = true;
 
 //  PERBAIKAN: Rate limiting system yang lebih ketat
 const pairingRateLimit = {
@@ -68,7 +68,7 @@ function findAvailablePort(startPort) {
         const tester = net.createServer()
             .once('error', (err) => {
                 if (err.code === 'EADDRINUSE') {
-                    resolve(findAvailablePort(startPort + 1));
+                    resolve(findAvailablePort(startPort + 0));
                 } else {
                     resolve(startPort);
                 }
@@ -2599,3 +2599,4 @@ if (require.main === module) {
     startServer().catch(console.error);
 
 }
+
